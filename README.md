@@ -450,4 +450,5 @@ Now send "Hi" to your WhatsApp number from another phone → the main menu list 
 Files you may need to edit: `parser.js` (incoming format) · `formatter.js` (outgoing list/button JSON) · `client.js` (endpoint/headers) · `media.js` (file download).
 Test everything offline with a fake MSG91: `npm run test:msg91`.
 #   b r i g t e c h b o t  
+ #   b r i g t e c h b o t  
  
