@@ -21,6 +21,7 @@ function message(m, prefs) {
   });
   if (o.list) out.list = o.list;
   if (o.buttons) out.buttons = o.buttons;
+  if (o.cta) out.cta = o.cta;
   if (o.datePicker) out.datePicker = o.datePicker;
   if (o.file) {
     out.file = {
@@ -79,6 +80,8 @@ function bookingView(b, prefs) {
     dateKey: o.dateKey,
     date: o.date ? new Date(o.date).toISOString() : null, // UTC instant of local midnight
     dateLabel: o.dateLabel,
+    timeLocal: o.timeLocal || null,
+    startsAt: o.startsAt ? new Date(o.startsAt).toISOString() : null,
     timeSlot: o.timeSlot,
     timezone: o.timezone,
     status: o.status,
