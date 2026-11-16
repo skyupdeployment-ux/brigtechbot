@@ -85,8 +85,27 @@ function buttonParts(text, buttons) {
   return parts;
 }
 
+/** "Pick date and time" style button that opens a web page (WhatsApp cta_url). Falls back to a plain link. */
+function ctaParts(msg) {
+  const label = cut(msg.cta.text, LIM.btnTitle);
+  const link = `👉 ${msg.cta.text}:\n${msg.cta.url}`;
+  const parts = [];
+  let body = msg.text;
+  if (Array.from(body).length > LIM.body) {
+    parts.push({ kind: 'text', text: msg.text });
+    body = 'Tap the button below.';
+  }
+  parts.push({
+    kind: 'interactive',
+    fallbackText: parts.length ? link : `${msg.text}\n\n${link}`,
+    interactive: { type: 'cta_url', body: { text: body }, action: { name: 'cta_url', parameters: { display_text: label, url: msg.cta.url } } },
+  });
+  return parts;
+}
+
 /** msg = an item of `botMessages` from the conversation service. */
 function build(msg) {
+  if (msg.cta) return ctaParts(msg);
   if (msg.list) return listParts(msg);
 
   if (msg.datePicker) {
