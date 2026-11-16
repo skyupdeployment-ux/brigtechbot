@@ -16,7 +16,7 @@ router.get('/health', (_req, res) =>
     status: 'ok',
     db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     uptime: process.uptime(),
-    version: 'wa-file-fallback-v3',
+    version: 'wa-picker-v4',
     commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
   })
 );
