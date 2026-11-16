@@ -76,7 +76,43 @@ const validateBookingDate = (key, tz, { minOffsetDays = 1, maxDays = 90 } = {}) 
   };
 };
 
+const zoneAbbr = (dt) => {
+  const n = dt.setLocale('en-IN').offsetNameShort;
+  if (n && !/^(GMT|UTC)[+-]/.test(n)) return n;
+  return dt.zoneName === 'Asia/Kolkata' ? 'IST' : n || dt.zoneName;
+};
+/** "Mon 16 Nov 2026, 11:02 PM (IST)" */
+const formatNowLine = (tz) => {
+  const dt = nowIn(tz);
+  return `${dt.setLocale('en').toFormat('ccc d LLL yyyy')}, ${dt.setLocale('en').toFormat('h:mm a')} (${zoneAbbr(dt)})`;
+};
+/** "Tuesday, 17 November 2026" and "5:58 PM (IST)" for a local date + HH:mm */
+const formatPicked = (dateKey, time24, tz) => {
+  const dt = DateTime.fromISO(`${dateKey}T${time24}`, { zone: tz });
+  return { date: dt.setLocale('en').toFormat('cccc, d LLLL yyyy'), time: `${dt.setLocale('en').toFormat('h:mm a')} (${zoneAbbr(dt)})`, short: dt.setLocale('en').toFormat('ccc, d LLL yyyy'), time12: dt.setLocale('en').toFormat('h:mm a') };
+};
+const slotOfHour = (h) => (h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening');
+/** "17/11/2026 5:30 PM", "17-11-2026 17:30" -> { dateKey, time } or null */
+const parseTypedDateTime = (text) => {
+  const m = String(text).trim().match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})[\s,T]+(\d{1,2})(?::(\d{2}))?\s*([ap])?\.?m?\.?$/i);
+  if (!m) return null;
+  let h = +m[4];
+  const min = m[5] ? +m[5] : 0;
+  if (m[6]) {
+    if (h < 1 || h > 12) return null;
+    h = (h % 12) + (m[6].toLowerCase() === 'p' ? 12 : 0);
+  }
+  if (h > 23 || min > 59) return null;
+  const pad2 = (n) => String(n).padStart(2, '0');
+  return { dateKey: `${m[3]}-${pad2(+m[2])}-${pad2(+m[1])}`, time: `${pad2(h)}:${pad2(min)}` };
+};
+
 module.exports = {
+  zoneAbbr,
+  formatNowLine,
+  formatPicked,
+  slotOfHour,
+  parseTypedDateTime,
   DATE_KEY_RE,
   isValidTimezone,
   nowIn,
