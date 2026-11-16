@@ -42,6 +42,7 @@ const sendMessage = Joi.object({
 });
 const selectDate = Joi.object({ date: dateKey.required(), messageId: objectId });
 const preferences = Joi.object({ timezone: tz, timeFormat }).min(1);
+const pickDateTime = Joi.object({ date: dateKey.required(), time: Joi.string().pattern(/^\d{2}:\d{2}$/).message('must be HH:mm').required() });
 const listMessages = Joi.object({
   afterSeq: Joi.number().integer().min(-1).default(-1),
   limit: Joi.number().integer().min(1).max(500).default(500),
@@ -138,7 +139,7 @@ const createBot = Joi.object({
 const updateBot = Joi.object({ ...botBase, bookingMaxDaysAhead: Joi.number().integer().min(7).max(365) }).min(1);
 
 module.exports = {
-  registerAdmin, login, startConversation, sendMessage, selectDate, preferences, listMessages, listConversations,
+  registerAdmin, login, startConversation, sendMessage, selectDate, pickDateTime, preferences, listMessages, listConversations,
   timeQuery, listEnquiries, updateEnquiry, listBookings, updateBooking, listActivities,
   listUsers, updateUser, adminUpdateUser, createBot, updateBot,
 };
