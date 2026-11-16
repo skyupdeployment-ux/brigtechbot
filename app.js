@@ -53,11 +53,15 @@ if (env.NODE_ENV !== 'test') app.use(morgan(env.isProd ? 'combined' : 'dev'));
 app.use(express.json({ limit: '50kb' }));
 app.use(sanitize);
 
+app.use('/pick', limiters.chat, require('./routes/pickerRoutes')); // page opened from the WhatsApp "Pick date and time" button
 app.use('/api', limiters.global, routes);
 app.use('/api', notFound);
 
-if (env.SERVE_FRONTEND) {
-  app.use(express.static(path.join(__dirname, 'public'), { maxAge: env.isProd ? '1h' : 0, index: 'index.html' }));
+const publicDir = path.join(__dirname, 'public');
+if (env.SERVE_FRONTEND && require('fs').existsSync(publicDir)) {
+  app.use(express.static(publicDir, { maxAge: env.isProd ? '1h' : 0, index: 'index.html' }));
+} else {
+  app.get('/', (_req, res) => res.json({ success: true, data: { service: 'brightech-bot-backend', status: 'running', health: '/api/health' } }));
 }
 
 app.use(errorHandler);
