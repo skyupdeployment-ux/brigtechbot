@@ -19,6 +19,9 @@ const bookingSchema = new mongoose.Schema(
     // Start of that calendar day in `timezone`, stored as a UTC instant.
     date: { type: Date, default: null },
     dateLabel: { type: String, maxlength: 60 }, // "Mon, 17 Nov" or "No preference"
+    // Exact time picked on the web picker (local time in `timezone`) and the same moment as a UTC instant.
+    timeLocal: { type: String, default: null, match: /^\d{2}:\d{2}$/ },
+    startsAt: { type: Date, default: null },
     timeSlot: { type: String, enum: ['Morning', 'Afternoon', 'Evening', 'No preference'], required: true },
     timezone: { type: String, required: true, validate: { validator: isValidTimezone, message: 'Invalid timezone' } },
     status: { type: String, enum: ['requested', 'confirmed', 'completed', 'cancelled'], default: 'requested' },
