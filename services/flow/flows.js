@@ -209,6 +209,13 @@ const FL = {
     ],
   },
 
+  // Used when DATETIME_PICKER is on: ONE step, the customer picks date + time on a web page.
+  __sched2: {
+    name: 'Book a time',
+    icon: '📅',
+    steps: [{ k: 'dtpick', key: 'Preferred date' }],
+  },
+
   __confirm: {
     name: 'Confirm enquiry',
     steps: [
@@ -229,7 +236,7 @@ const FL = {
       T('Manufacturer / brand', 'Please enter the product manufacturer / brand.'),
       T('Model / part number', 'Please enter the model number / part number.'),
       T('Quantity', 'Please enter the required quantity (numbers only).', { v: 'num' }),
-      M('Product image', 'Please send a product image or a photograph of the nameplate.', 'a product image or nameplate photograph', { accept: 'image', req: true }),
+      M('Product image', 'Please send a product image or a photograph of the nameplate.', 'a product image or nameplate photograph', { accept: 'image', opt: true }),
       L('Requirement', 'Your Requirement', 'Select Requirement', 'What is your requirement?', REQ_TYPE),
       T('Full name', 'Please enter your full name.'),
       T('Company name', 'Please enter your company name.'),
@@ -345,7 +352,7 @@ const FL = {
       T('Preferred job role', 'Please enter your preferred job role.'),
       T('Preferred location', 'Please enter your preferred location.'),
       T('Contact number', 'Please enter your contact number.', { v: 'phone' }),
-      M('Resume (PDF)', 'Please upload your resume as a PDF.', 'your resume as a PDF document', { accept: 'pdf', req: true }),
+      M('Resume (PDF)', 'Please upload your resume as a PDF.', 'your resume as a PDF document', { accept: 'pdf', opt: true }),
     ],
     done: 'Thank you for submitting your career enquiry!\n\nOur recruitment team will review your details and contact you if a suitable opportunity is available.',
   },
