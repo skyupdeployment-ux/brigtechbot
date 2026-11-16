@@ -19,7 +19,10 @@ const env = {
   NODE_ENV,
   isProd,
   PORT: toInt(process.env.PORT, 5000),
-  MONGODB_URI: process.env.MONGODB_URI,
+  // Railway's MongoDB service exposes MONGO_URL; Atlas users set MONGODB_URI.
+  MONGODB_URI: process.env.MONGODB_URI || process.env.MONGO_URL,
+  // Used when the URI has no database name (Railway's URL has none).
+  MONGODB_DB_NAME: process.env.MONGODB_DB_NAME || '',
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
   FILE_URL_TTL_SECONDS: toInt(process.env.FILE_URL_TTL_SECONDS, 3600),
@@ -44,7 +47,14 @@ const env = {
   AUTH_RATE_LIMIT_MAX: toInt(process.env.AUTH_RATE_LIMIT_MAX, 20),
   CHAT_RATE_LIMIT_MAX: toInt(process.env.CHAT_RATE_LIMIT_MAX, 60),
   UPLOAD_RATE_LIMIT_MAX: toInt(process.env.UPLOAD_RATE_LIMIT_MAX, 30),
-  SERVE_FRONTEND: toBool(process.env.SERVE_FRONTEND, true),
+  SERVE_FRONTEND: toBool(process.env.SERVE_FRONTEND, false),
+
+  // ---- "Pick date and time" web picker (opened from a WhatsApp button) ----
+  DATETIME_PICKER: toBool(process.env.DATETIME_PICKER, false),
+  PICKER_MIN_LEAD_MINUTES: toInt(process.env.PICKER_MIN_LEAD_MINUTES, 30),
+  PICKER_LINK_HOURS: toInt(process.env.PICKER_LINK_HOURS, 24),
+  // Public https address of this server. On Railway it is detected from RAILWAY_PUBLIC_DOMAIN.
+  PUBLIC_BASE_URL: (process.env.PUBLIC_BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '')).replace(/\/$/, ''),
 
   // ---- MSG91 WhatsApp channel ----
   MSG91_ENABLED: toBool(process.env.MSG91_ENABLED, false),
@@ -67,7 +77,7 @@ const env = {
 
 env.validate = () => {
   const problems = [];
-  if (!env.MONGODB_URI) problems.push('MONGODB_URI is required.');
+  if (!env.MONGODB_URI) problems.push('MONGODB_URI (or MONGO_URL) is required.');
   if (!env.JWT_SECRET) problems.push('JWT_SECRET is required.');
   else if (env.JWT_SECRET.length < 32) problems.push('JWT_SECRET must be at least 32 characters.');
   if (env.MSG91_ENABLED) {
@@ -75,6 +85,7 @@ env.validate = () => {
     if (!env.MSG91_INTEGRATED_NUMBER) problems.push('MSG91_INTEGRATED_NUMBER is required when MSG91_ENABLED=true (digits with country code, no +).');
     if (isProd && env.MSG91_WEBHOOK_SECRET.length < 16) problems.push('MSG91_WEBHOOK_SECRET (16+ chars) is required in production.');
   }
+  if (env.DATETIME_PICKER && !env.PUBLIC_BASE_URL) problems.push('DATETIME_PICKER=true needs PUBLIC_BASE_URL (your https address), e.g. https://your-app.up.railway.app');
   if (isProd && env.corsOrigins.includes('*')) problems.push('CORS_ORIGINS must not be "*" in production.');
   if (problems.length) {
     throw new Error('Invalid environment configuration:\n - ' + problems.join('\n - '));
