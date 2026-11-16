@@ -17,10 +17,53 @@ const client = require('./client');
 const formatter = require('./formatter');
 const media = require('./media');
 const { parseInbound } = require('./parser');
+const BotEngine = require('../flow/engine');
 const { withLock } = require('../../utils/lock');
 const logger = require('../../utils/logger');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* ---- Safety net for file steps -------------------------------------------------------------
+ * If a customer sends a file and we cannot download it (unknown MSG91 format, host not allowed ...),
+ * the chat must not get stuck. When the bot is at a file step we accept the file by NAME, log a
+ * [FILE FALLBACK] warning with MSG91's raw message, and let the flow continue.
+ */
+const FILE_NAME_RE = /\.(pdf|docx?|xlsx?|jpe?g|png|webp|gif|heic|heif|bmp|mp4|mov|3gp|webm|dwg|dxf|txt)$/i;
+const MIME_BY_EXT = {
+  pdf: 'application/pdf', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', txt: 'text/plain',
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', heic: 'image/heic', heif: 'image/heif', bmp: 'image/bmp',
+  mp4: 'video/mp4', mov: 'video/quicktime', '3gp': 'video/3gpp', webm: 'video/webm', dwg: 'application/octet-stream', dxf: 'application/octet-stream',
+};
+
+function atMediaStep(conv) {
+  try {
+    const e = BotEngine.fromStored(conv.state, {});
+    const st = e.curStep();
+    return !!(e.isActive() && st && st.k === 'media');
+  } catch (_e) {
+    return false;
+  }
+}
+
+/** Gives a file a name and MIME type the bot's file step will accept. */
+function fileIdentity(name, type) {
+  let n = String(name || '').trim().slice(0, 200);
+  if (!FILE_NAME_RE.test(n)) {
+    const ext = type === 'image' ? '.jpg' : type === 'video' ? '.mp4' : '.pdf';
+    n = (n || (type === 'image' ? 'photo' : type === 'video' ? 'video' : 'document')) + ext;
+  }
+  const ext = n.split('.').pop().toLowerCase();
+  return { name: n, mime: MIME_BY_EXT[ext] || 'application/octet-stream' };
+}
+
+async function acceptWithoutFile(conv, user, number, name, type, why, payload) {
+  const f = fileIdentity(name, type);
+  logger.warn(`[FILE FALLBACK] ${why} - accepting "${f.name}" without storing the file. Raw message: ${JSON.stringify(payload).slice(0, 1500)}`);
+  const result = await conversationService.sendFiles(conv._id, user, [{ originalname: f.name, mimetype: f.mime, size: 0, filename: null }], [], {});
+  await deliver(number, result.botMessages);
+  return { handled: true, kind: 'file-fallback', enquiry: result.enquiry };
+}
 
 async function findOrCreateConversation(number) {
   const bot = await botService.getActiveBySlug(env.DEFAULT_BOT_SLUG);
@@ -69,8 +112,15 @@ async function deliver(number, botMessages) {
 
 async function handleOne(payload) {
   const ev = parseInbound(payload);
+  if (env.MSG91_LOG_RAW) logger.info('[MSG91 parsed]', ev.kind, ev.text ? JSON.stringify(ev.text) : '', ev.reason || '');
   if (ev.kind === 'ignore') {
-    logger.debug('MSG91 webhook ignored:', ev.reason);
+    logger.info('MSG91 webhook ignored:', ev.reason);
+    if (ev.reason === 'empty interactive reply' && ev.number && ev.number !== env.MSG91_INTEGRATED_NUMBER) {
+      // The customer tapped something we could not read - never leave them in silence.
+      await client
+        .sendText(ev.number, 'Sorry, I could not read that selection. Please type the option number (for example 6) or its name.')
+        .catch((e) => logger.warn(`MSG91 send failed: ${e.message}`));
+    }
     return { handled: false, reason: ev.reason };
   }
   if (ev.number === env.MSG91_INTEGRATED_NUMBER) return { handled: false, reason: 'own number' };
@@ -87,6 +137,14 @@ async function handleOne(payload) {
       const { user, conv } = await findOrCreateConversation(ev.number);
       let result;
 
+      if (ev.kind === 'text' && FILE_NAME_RE.test(ev.text.trim()) && atMediaStep(conv)) {
+        return acceptWithoutFile(conv, user, ev.number, ev.text.trim(), '', 'file arrived as a text message', payload);
+      }
+
+      if (ev.kind === 'unsupported' && ev.media && atMediaStep(conv)) {
+        return acceptWithoutFile(conv, user, ev.number, ev.media.filename, ev.media.type, ev.reason || 'file without a download link', payload);
+      }
+
       if (ev.kind === 'unsupported') {
         await client.sendText(ev.number, 'Sorry, I can only read text, list/button selections, photos, documents and videos. Please reply in one of those ways.');
         return { handled: true, kind: 'unsupported' };
@@ -98,6 +156,7 @@ async function handleOne(payload) {
           file = await media.download(ev.media);
         } catch (e) {
           logger.warn(`MSG91 media download failed: ${e.message}`);
+          if (atMediaStep(conv)) return acceptWithoutFile(conv, user, ev.number, ev.media.filename, ev.media.type, `download failed (${e.message})`, payload);
           await client.sendText(ev.number, 'Sorry, we could not receive that file. Please try sending it again.');
           return { handled: true, kind: 'media-error' };
         }
@@ -110,7 +169,10 @@ async function handleOne(payload) {
           throw e;
         }
       } else {
-        const text = ev.text.slice(0, 1000);
+        // A tapped list row can arrive as "Title\nDescription" - the option name is the first line.
+        let text = (ev.kind === 'choice' ? ev.text.split('\n')[0].trim() || ev.text : ev.text).slice(0, 1000);
+        // At a file step typed text is never a valid answer, so a greeting means "start over".
+        if (ev.kind === 'text' && /^(hi+|hello|hey|hai|menu|start|restart)$/i.test(text.trim()) && atMediaStep(conv)) text = 'main menu';
         result = await conversationService.sendMessage(conv._id, user, { type: ev.kind === 'choice' ? 'choice' : 'text', text }, {});
       }
 
