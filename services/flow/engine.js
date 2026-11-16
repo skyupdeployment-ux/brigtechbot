@@ -10,7 +10,7 @@
 
 const { DateTime } = require('luxon');
 const { norm, strip, clean } = require('../../utils/text');
-const { validateBookingDate, DATE_KEY_RE } = require('../../utils/time');
+const { validateBookingDate, DATE_KEY_RE, formatNowLine, formatPicked, slotOfHour, parseTypedDateTime } = require('../../utils/time');
 const { FL, KW, GREET, INVALID, SCHED_TEXT, REF_CODES } = require('./flows');
 
 const toPairs = (obj) => Object.keys(obj).map((k) => ({ k, v: obj[k] }));
@@ -43,6 +43,7 @@ class BotEngine {
       pendingFlow: null,
       dateKey: null,
       timeSlot: null,
+      timeLocal: null,
       submissions: 0,
     };
   }
@@ -94,6 +95,7 @@ class BotEngine {
     if (msg.list) m.list = msg.list;
     if (msg.btns) m.btns = msg.btns;
     if (msg.datePicker) m.datePicker = msg.datePicker;
+    if (msg.picker) m.picker = true;
     this.out.push(m);
   }
 
@@ -118,6 +120,17 @@ class BotEngine {
       }
       const nav = !st.nonav && S.flow !== 'main' ? [{ t: '⬅️ Go Back' }, { t: '🏠 Main Menu' }] : [];
       this.bot({ head, text: body, list: { btn: st.btn, title: st.head || st.btn, rows: rows.map(rowView), nav: nav.map(rowView) } });
+    } else if (st.k === 'dtpick') {
+      const ex = this.ctx.now().plus({ days: 1 }).toFormat('dd/MM/yyyy');
+      this.bot({
+        text:
+          (prefix || '') +
+          this.schedText() +
+          '\n\n🕒 *Now:* ' + formatNowLine(this.ctx.tz) +
+          '\n\nTap the button below to pick your date and time.' +
+          '\n\nOr type it, for example *' + ex + ' 5:30 PM*. Type *No preference* if you have none.',
+        picker: true,
+      });
     } else if (st.k === 'btns') {
       const b = st.opts.map((o) => o.t);
       if (!st.nonav && b.length === 2) b.push('Go Back');
@@ -171,6 +184,7 @@ class BotEngine {
     S.fname = '';
     S.dateKey = null;
     S.timeSlot = null;
+    S.timeLocal = null;
     this.sendStep();
   }
 
@@ -188,6 +202,7 @@ class BotEngine {
       S.fname = f.name;
       S.dateKey = null;
       S.timeSlot = null;
+      S.timeLocal = null;
     } else if (f.top && FL[f.top]) S.fname = f.name;
     if (preset && !f.topLevel) Object.assign(S.data, preset);
     if (f.topLevel || f.top) this.effects.push({ type: 'FLOW_STARTED', flow: id, flowName: f.name });
@@ -211,11 +226,11 @@ class BotEngine {
 
   finish() {
     const S = this.S;
-    if (S.flow !== '__sched') {
+    if (S.flow !== '__sched' && S.flow !== '__sched2') {
       const f = FL[S.flow];
       S.pendingFlow = S.flow;
       S.last = f.top || S.flow;
-      S.flow = '__sched';
+      S.flow = this.ctx && this.ctx.picker ? '__sched2' : '__sched';
       S.idx = 0;
       S.sub = null;
     } else {
@@ -259,6 +274,8 @@ class BotEngine {
       dateKey: S.dateKey || null,
       dateLabel: S.data['Preferred date'] || 'No preference',
       timeSlot: S.timeSlot || clean(String(S.data['Preferred time'] || 'No preference')),
+      timeLocal: S.timeLocal || null,
+      startsAt: S.dateKey && S.timeLocal && this.ctx && this.ctx.tz ? DateTime.fromISO(`${S.dateKey}T${S.timeLocal}`, { zone: this.ctx.tz }).toUTC().toJSDate() : null,
       submissionNo: (S.submissions || 0) + 1,
     };
   }
@@ -389,6 +406,58 @@ class BotEngine {
     return { label: v.label, desc: v.desc };
   }
 
+  /**
+   * Date + time chosen on the web picker (or typed). dateKey = YYYY-MM-DD, time24 = HH:mm (local time).
+   * Returns { label, ... } on success or { error: { code, message } }.
+   */
+  selectDateTime(dateKey, time24) {
+    const S = this.S;
+    if (!this.isActive() || S.flow !== '__sched2') {
+      return { error: { code: 'DATE_NOT_EXPECTED', message: 'No date and time is being requested right now.' } };
+    }
+    const tz = this.ctx.tz;
+    const dt = DATE_KEY_RE.test(String(dateKey)) && /^\d{2}:\d{2}$/.test(String(time24)) ? DateTime.fromISO(`${dateKey}T${time24}`, { zone: tz }) : null;
+    if (!dt || !dt.isValid) return { error: { code: 'INVALID_DATETIME', message: 'That is not a valid date and time.' } };
+    const now = this.ctx.now();
+    const lead = this.ctx.minLeadMinutes != null ? this.ctx.minLeadMinutes : 30;
+    if (dt < now.plus({ minutes: lead })) {
+      return { error: { code: 'DATETIME_IN_PAST', message: `Please choose a time at least ${lead} minutes from now.` } };
+    }
+    if (dt > now.plus({ days: this.ctx.maxDaysAhead })) {
+      return { error: { code: 'DATE_TOO_FAR', message: `Please choose a date within the next ${this.ctx.maxDaysAhead} days.` } };
+    }
+    const p = formatPicked(dateKey, time24, tz);
+    S.dateKey = dateKey;
+    S.timeLocal = time24;
+    S.timeSlot = slotOfHour(dt.hour);
+    S.data['Preferred date'] = p.short;
+    S.data['Preferred time'] = p.time12;
+    this.effects.push({ type: 'DATE_SELECTED', dateKey, label: p.short });
+    this.effects.push({ type: 'TIME_SELECTED', slot: S.timeSlot });
+    this.bot({ text: '✅ *Date and time saved*\n\n📅 ' + p.date + '\n⏰ ' + p.time });
+    this.advance();
+    return { label: p.short + ', ' + p.time12, desc: p.date + ', ' + p.time };
+  }
+
+  /** Typed answer at the picker step: "No preference" or "17/11/2026 5:30 PM". */
+  typedDateTime(raw, t) {
+    const S = this.S;
+    if (t === 'no preference') {
+      S.data['Preferred date'] = 'No preference';
+      S.data['Preferred time'] = 'No preference';
+      S.dateKey = null;
+      S.timeLocal = null;
+      S.timeSlot = 'No preference';
+      this.effects.push({ type: 'DATE_SELECTED', dateKey: null, label: 'No preference' });
+      return this.advance();
+    }
+    const parsed = parseTypedDateTime(raw);
+    if (!parsed) return this.err('Please tap the button to pick your date and time, or type it like ' + this.ctx.now().plus({ days: 1 }).toFormat('dd/MM/yyyy') + ' 5:30 PM, or type No preference.');
+    const res = this.selectDateTime(parsed.dateKey, parsed.time);
+    if (res.error) return this.err(res.error.message);
+    return res;
+  }
+
   onText(raw) {
     const S = this.S;
     const t = norm(raw);
@@ -411,9 +480,17 @@ class BotEngine {
     const free = st && (st.k === 'text' || st.k === 'media');
     if (!free) {
       if (GREET.includes(t)) return this.showMain();
-      if (KW[t]) return this.act(KW[t]);
+      if (KW[t]) {
+        // A real option on the current list wins over a keyword shortcut. Without this, picking "PLC"
+        // in the Service equipment list was hijacked by the "plc" shortcut and sent to Product Enquiry.
+        const listStep = st && (st.k === 'list' || st.k === 'btns') && S.sub !== 'datepick';
+        const optionHit = listStep ? this.matchOpt(st, t) : null;
+        if (!optionHit) return this.act(KW[t]);
+      }
     }
     if (!st) return this.showMain();
+
+    if (st.k === 'dtpick') return this.typedDateTime(raw, t);
 
     if (st.k === 'list' || st.k === 'btns') {
       if (S.sub === 'datepick' && st.key === 'Preferred date') return this.typedDate(raw);
