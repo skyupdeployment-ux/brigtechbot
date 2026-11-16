@@ -28,9 +28,13 @@ const prefsOf = (conv, bot) => ({
   timeFormat: (conv.preferences && conv.preferences.timeFormat) || bot.timeFormat,
 });
 
+const env = require('../config/env');
+
 const makeCtx = (prefs, bot) => ({
   tz: prefs.timezone,
   maxDaysAhead: bot.bookingMaxDaysAhead,
+  minLeadMinutes: env.PICKER_MIN_LEAD_MINUTES,
+  picker: !!(env.DATETIME_PICKER && env.PUBLIC_BASE_URL),
   now: () => nowIn(prefs.timezone),
 });
 
@@ -67,13 +71,18 @@ async function resolveQuoteTarget(conv, messageId) {
 
 const botDoc = (m) => ({
   role: 'bot',
-  kind: m.list || m.btns || m.datePicker ? 'interactive' : 'text',
+  kind: m.list || m.btns || m.datePicker || m.cta ? 'interactive' : 'text',
   head: m.head,
   text: m.text,
   list: m.list,
   buttons: m.btns,
   datePicker: m.datePicker,
+  cta: m.cta,
 });
+
+/** One-conversation link to the "Pick date and time" page (valid for PICKER_LINK_HOURS). */
+const pickerUrl = (conv, engine) =>
+  `${env.PUBLIC_BASE_URL}/pick/${tokenService.signPicker({ cid: conv._id.toString(), n: engine.S.submissions || 0 }, env.PICKER_LINK_HOURS)}`;
 
 function extractContact(answers) {
   const get = (...keys) => {
@@ -137,6 +146,8 @@ async function createEnquiry(c) {
         dateKey: snap.dateKey,
         date: dateUtc,
         dateLabel: snap.dateLabel,
+        timeLocal: snap.timeLocal,
+        startsAt: snap.startsAt,
         timeSlot: snap.timeSlot,
         timezone: prefs.timezone,
       },
@@ -175,6 +186,9 @@ async function commit(c, userDocs, { req, socketId } = {}) {
   // 2) messages, strictly ordered by seq
   const last = await Message.findOne({ conversation: conv._id }).sort({ seq: -1 }).select('seq').lean();
   const startSeq = last ? last.seq + 1 : 0;
+  engine.out.forEach((m) => {
+    if (m.picker) m.cta = { text: 'Pick date and time', url: pickerUrl(conv, engine) };
+  });
   const docs = [...userDocs, ...engine.out.map(botDoc)].map((d, i) => ({ ...d, conversation: conv._id, seq: startSeq + i }));
   const saved = docs.length ? await Message.insertMany(docs) : [];
 
@@ -362,6 +376,51 @@ async function selectDate(id, actor, body, ctx) {
   });
 }
 
+/**
+ * Called by the web picker page. The signed link is the authorisation (no login).
+ * Returns the bot's next messages plus how to deliver them (WhatsApp number or web).
+ */
+async function submitDateTime(id, linkCount, body, ctx) {
+  const conv0 = await Conversation.findById(id);
+  if (!conv0) throw AppError.notFound('This link is no longer valid.', 'CONVERSATION_NOT_FOUND');
+  const owner = await User.findById(conv0.user);
+  if (!owner) throw AppError.notFound('This link is no longer valid.', 'USER_NOT_FOUND');
+  return withConversation(id, owner, async (c) => {
+    if ((c.engine.S.submissions || 0) !== linkCount) throw AppError.conflict('This link has expired. Please use the newest message in WhatsApp.', 'LINK_EXPIRED');
+    const res = c.engine.selectDateTime(body.date, body.time);
+    if (res.error) {
+      const status = res.error.code === 'DATE_NOT_EXPECTED' ? 409 : 422;
+      throw new AppError(status, res.error.code, res.error.message);
+    }
+    const result = await commit(c, [{ role: 'user', kind: 'choice', text: res.label, desc: res.desc }], ctx);
+    result.delivery = { channel: c.conv.channel, waNumber: owner.waNumber || null };
+    return result;
+  });
+}
+
+/** What the picker page needs to show: server time, allowed range, and whether the link is still usable. */
+async function pickerInfo(id, linkCount) {
+  const conv = await Conversation.findById(id);
+  if (!conv) throw AppError.notFound('This link is no longer valid.', 'CONVERSATION_NOT_FOUND');
+  const bot = await botService.getById(conv.bot);
+  const prefs = prefsOf(conv, bot);
+  const ctx = makeCtx(prefs, bot);
+  const engine = BotEngine.fromStored(conv.state, ctx);
+  const now = ctx.now();
+  const active = engine.isActive() && engine.S.flow === '__sched2' && (engine.S.submissions || 0) === linkCount;
+  return {
+    active,
+    reason: active ? null : engine.S.flow === '__confirm' || (engine.S.submissions || 0) > linkCount ? 'already_saved' : 'expired',
+    timezone: prefs.timezone,
+    epochMs: now.toMillis(),
+    nowLine: require('../utils/time').formatNowLine(prefs.timezone),
+    minDate: now.toISODate(),
+    maxDate: now.plus({ days: bot.bookingMaxDaysAhead }).toISODate(),
+    minLeadMinutes: ctx.minLeadMinutes,
+    utcOffsetMinutes: now.offset,
+  };
+}
+
 async function idle(id, actor, ctx) {
   return withConversation(id, actor, async (c) => {
     if (!c.engine.isActive()) {
@@ -413,4 +472,4 @@ async function remove(id, actor, req) {
   });
 }
 
-module.exports = { createConversation, startOrResume, getOne, listMessages, list, sendMessage, sendFiles, selectDate, idle, restart, updatePreferences, remove };
+module.exports = { submitDateTime, pickerInfo, createConversation, startOrResume, getOne, listMessages, list, sendMessage, sendFiles, selectDate, idle, restart, updatePreferences, remove };
