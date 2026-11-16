@@ -25,4 +25,14 @@ const verifyFile = (token) => {
   return payload;
 };
 
-module.exports = { signAccess, verifyAccess, signFile, verifyFile };
+// Link sent to the customer on WhatsApp: opens the "Pick date and time" page for ONE conversation.
+const signPicker = (payload, hours) =>
+  jwt.sign({ ...payload, typ: 'picker' }, env.JWT_SECRET, { expiresIn: `${hours}h`, issuer: 'brightech-bot' });
+
+const verifyPicker = (token) => {
+  const payload = jwt.verify(token, env.JWT_SECRET, { issuer: 'brightech-bot' });
+  if (payload.typ !== 'picker') throw new jwt.JsonWebTokenError('wrong token type');
+  return payload;
+};
+
+module.exports = { signAccess, verifyAccess, signFile, verifyFile, signPicker, verifyPicker };
