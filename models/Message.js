@@ -22,6 +22,10 @@ const messageSchema = new mongoose.Schema(
       default: undefined,
     },
     buttons: { type: [String], default: undefined },
+    cta: {
+      type: new mongoose.Schema({ text: String, url: { type: String, maxlength: 1000 } }, { _id: false }),
+      default: undefined,
+    },
     datePicker: {
       type: new mongoose.Schema({ min: String, max: String, btn: String }, { _id: false }),
       default: undefined,
