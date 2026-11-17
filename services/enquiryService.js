@@ -60,7 +60,10 @@ async function update(id, body, actor, req) {
   if (body.status !== undefined) enquiry.status = body.status;
   if (body.adminNotes !== undefined) enquiry.adminNotes = body.adminNotes;
   await enquiry.save();
-  if (body.status === 'cancelled') await Booking.updateOne({ enquiry: enquiry._id }, { $set: { status: 'cancelled' } });
+  if (body.status === 'cancelled') {
+    await Booking.updateOne({ enquiry: enquiry._id }, { $set: { status: 'cancelled' } });
+    await require('./slotService').releaseForEnquiry(enquiry._id); // the time becomes free again
+  }
   await activityService.log('enquiry_updated', { user: enquiry.user, actor: actor._id, enquiry: enquiry._id, conversation: enquiry.conversation, meta: body, req });
   const booking = await Booking.findOne({ enquiry: enquiry._id });
   return serializers.enquiry(enquiry, booking, prefsFor(actor));
@@ -69,6 +72,7 @@ async function update(id, body, actor, req) {
 async function remove(id, actor, req) {
   const enquiry = await load(id, actor);
   await Booking.deleteMany({ enquiry: enquiry._id });
+  await require('./slotService').releaseForEnquiry(enquiry._id); // the time becomes free again
   await enquiry.deleteOne();
   await fileService.remove((enquiry.attachments || []).map((a) => a.storedName));
   await activityService.log('enquiry_deleted', { user: enquiry.user, actor: actor._id, conversation: enquiry.conversation, meta: { reference: enquiry.reference }, req });
