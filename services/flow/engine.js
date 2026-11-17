@@ -11,6 +11,7 @@
 const { DateTime } = require('luxon');
 const { norm, strip, clean } = require('../../utils/text');
 const { validateBookingDate, DATE_KEY_RE, formatNowLine, formatPicked, slotOfHour, parseTypedDateTime } = require('../../utils/time');
+const slotRules = require('../../utils/slots');
 const { FL, KW, GREET, INVALID, SCHED_TEXT, REF_CODES } = require('./flows');
 
 const toPairs = (obj) => Object.keys(obj).map((k) => ({ k, v: obj[k] }));
@@ -127,8 +128,10 @@ class BotEngine {
           (prefix || '') +
           this.schedText() +
           '\n\n🕒 *Now:* ' + formatNowLine(this.ctx.tz) +
-          '\n\nTap the button below to pick your date and time.' +
-          '\n\nOr type it, for example *' + ex + ' 5:30 PM*. Type *No preference* if you have none.',
+          (this.ctx.slots
+            ? '\n\nTap the button below to choose a date and an available time.\n\nType *No preference* if you have none.'
+            : '\n\nTap the button below to pick your date and time.' +
+              '\n\nOr type it, for example *' + ex + ' 5:30 PM*. Type *No preference* if you have none.'),
         picker: true,
       });
     } else if (st.k === 'btns') {
@@ -285,9 +288,11 @@ class BotEngine {
     const f = FL[S.pendingFlow];
     const txt = typeof f.done === 'function' ? f.done(S.data) : f.done;
     S.data['Reference no.'] = ref;
-    const slot = S.data['Preferred date']
-      ? '\n📅 *Requested slot:* ' + S.data['Preferred date'] + ', ' + S.data['Preferred time'] + '\nOur team will confirm the final time.'
-      : '';
+    const slot = this.ctx && this.ctx.slots && S.timeLocal
+      ? '\n📅 *Your slot:* ' + S.data['Preferred date'] + ', ' + S.data['Preferred time'] + '\nThis time is reserved for you.'
+      : S.data['Preferred date']
+        ? '\n📅 *Requested slot:* ' + S.data['Preferred date'] + ', ' + S.data['Preferred time'] + '\nOur team will confirm the final time.'
+        : '';
     this.bot({ text: txt + '\n\n🔖 *Reference no.:* ' + ref + slot + '\nPlease quote the reference when you contact us.' });
     S.flow = '__done';
     S.idx = 0;
@@ -406,11 +411,8 @@ class BotEngine {
     return { label: v.label, desc: v.desc };
   }
 
-  /**
-   * Date + time chosen on the web picker (or typed). dateKey = YYYY-MM-DD, time24 = HH:mm (local time).
-   * Returns { label, ... } on success or { error: { code, message } }.
-   */
-  selectDateTime(dateKey, time24) {
+  /** Is this date + time acceptable? (no state change). Returns { ok: true } or { error: { code, message } }. */
+  checkDateTime(dateKey, time24) {
     const S = this.S;
     if (!this.isActive() || S.flow !== '__sched2') {
       return { error: { code: 'DATE_NOT_EXPECTED', message: 'No date and time is being requested right now.' } };
@@ -426,6 +428,22 @@ class BotEngine {
     if (dt > now.plus({ days: this.ctx.maxDaysAhead })) {
       return { error: { code: 'DATE_TOO_FAR', message: `Please choose a date within the next ${this.ctx.maxDaysAhead} days.` } };
     }
+    if (this.ctx.slots && !slotRules.isValidStart(dateKey, time24, tz, this.ctx.slots)) {
+      return { error: { code: 'SLOT_NOT_AVAILABLE', message: 'That time is not available. Please choose one of the available times.' } };
+    }
+    return { ok: true, dt };
+  }
+
+  /**
+   * Date + time chosen on the web picker. dateKey = YYYY-MM-DD, time24 = HH:mm (local time).
+   * Returns { label, desc } on success or { error: { code, message } }.
+   */
+  selectDateTime(dateKey, time24) {
+    const check = this.checkDateTime(dateKey, time24);
+    if (check.error) return check;
+    const S = this.S;
+    const tz = this.ctx.tz;
+    const dt = check.dt;
     const p = formatPicked(dateKey, time24, tz);
     S.dateKey = dateKey;
     S.timeLocal = time24;
@@ -437,6 +455,21 @@ class BotEngine {
     this.bot({ text: '✅ *Date and time saved*\n\n📅 ' + p.date + '\n⏰ ' + p.time });
     this.advance();
     return { label: p.short + ', ' + p.time12, desc: p.date + ', ' + p.time };
+  }
+
+  /** The chosen slot was lost before the customer confirmed: ask again (no enquiry is created). */
+  reopenBooking(message) {
+    const S = this.S;
+    this.effects = this.effects.filter((e) => e.type !== 'COMPLETE');
+    S.flow = '__sched2';
+    S.idx = 0;
+    S.sub = null;
+    S.dateKey = null;
+    S.timeLocal = null;
+    S.timeSlot = null;
+    delete S.data['Preferred date'];
+    delete S.data['Preferred time'];
+    this.sendStep('⚠️ ' + message + '\n\n');
   }
 
   /** Typed answer at the picker step: "No preference" or "17/11/2026 5:30 PM". */
@@ -451,6 +484,7 @@ class BotEngine {
       this.effects.push({ type: 'DATE_SELECTED', dateKey: null, label: 'No preference' });
       return this.advance();
     }
+    if (this.ctx.slots) return this.err('Please tap the button to choose a date and one of the available times. Or type No preference.');
     const parsed = parseTypedDateTime(raw);
     if (!parsed) return this.err('Please tap the button to pick your date and time, or type it like ' + this.ctx.now().plus({ days: 1 }).toFormat('dd/MM/yyyy') + ' 5:30 PM, or type No preference.');
     const res = this.selectDateTime(parsed.dateKey, parsed.time);
