@@ -39,6 +39,14 @@ exports.info = asyncHandler(async (req, res) => {
   ok(res, await conversationService.pickerInfo(link.cid, link.n));
 });
 
+exports.slots = asyncHandler(async (req, res) => {
+  noStore(res);
+  const link = linkOf(req.params.token);
+  const date = String(req.query.date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw AppError.unprocessable('Please send ?date=YYYY-MM-DD.', 'INVALID_DATE');
+  ok(res, await conversationService.pickerSlots(link.cid, link.n, date));
+});
+
 exports.submit = asyncHandler(async (req, res) => {
   noStore(res);
   const link = linkOf(req.params.token);
