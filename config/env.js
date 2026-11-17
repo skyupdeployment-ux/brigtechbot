@@ -12,6 +12,13 @@ const toBool = (value, fallback) => {
   return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
 };
 
+// Railway tells every service its own public address; with it the calendar needs no extra setting.
+const PUBLIC_BASE_URL = (
+  process.env.PUBLIC_BASE_URL ||
+  (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '') ||
+  (process.env.RAILWAY_STATIC_URL ? `https://${process.env.RAILWAY_STATIC_URL.replace(/^https?:\/\//, '')}` : '')
+).replace(/\/$/, '');
+
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const isProd = NODE_ENV === 'production';
 
@@ -50,11 +57,12 @@ const env = {
   SERVE_FRONTEND: toBool(process.env.SERVE_FRONTEND, false),
 
   // ---- "Pick date and time" web picker (opened from a WhatsApp button) ----
-  DATETIME_PICKER: toBool(process.env.DATETIME_PICKER, false),
+  // ON by itself whenever the server knows its public address (set DATETIME_PICKER=false to turn the calendar off).
+  DATETIME_PICKER: toBool(process.env.DATETIME_PICKER, !!PUBLIC_BASE_URL),
   PICKER_MIN_LEAD_MINUTES: toInt(process.env.PICKER_MIN_LEAD_MINUTES, 30),
   PICKER_LINK_HOURS: toInt(process.env.PICKER_LINK_HOURS, 24),
-  // Public https address of this server. On Railway it is detected from RAILWAY_PUBLIC_DOMAIN.
-  PUBLIC_BASE_URL: (process.env.PUBLIC_BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '')).replace(/\/$/, ''),
+  // Public https address of this server (PUBLIC_BASE_URL, or detected from Railway).
+  PUBLIC_BASE_URL,
 
   // ---- Meeting slots (used by the "Pick date and time" page) ----
   // A meeting of BOOKING_MEETING_MINUTES blocks that time PLUS BOOKING_BUFFER_MINUTES, so a meeting that
