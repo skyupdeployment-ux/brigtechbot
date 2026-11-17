@@ -48,24 +48,33 @@ button:focus-visible{outline:3px solid #9ed8cc;outline-offset:2px}
 .ok .tick{width:64px;height:64px;border-radius:50%;background:var(--wa2);color:var(--wa);display:grid;place-items:center;margin:0 auto 12px;font-size:34px;font-weight:700}
 .ok h2{margin:0 0 6px;font-size:21px;color:var(--navy)}
 .ok p{margin:4px 0;color:var(--mute)}
-/* calendar sheet */
+/* calendar sheet (Google-Calendar style: one month, big days, month chips at the bottom) */
 .sheet{position:fixed;inset:0;background:rgba(11,20,26,.5);display:flex;align-items:flex-end;justify-content:center;z-index:10}
-.panel{background:#fff;width:100%;max-width:520px;height:88vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column}
-.ph{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #eceff1}
-.ph h2{margin:0;font-size:18px;color:var(--navy)}
-.ph button{border:0;background:none;font-size:28px;line-height:1;color:var(--mute);cursor:pointer;padding:0 6px}
-.dow{display:grid;grid-template-columns:repeat(7,1fr);padding:8px 12px 4px;text-align:center;border-bottom:1px solid #eceff1}
-.dow span{font-size:12px;font-weight:600;color:var(--mute)}
-.months{overflow-y:auto;padding:4px 12px 24px;flex:1}
-.mt{margin:18px 0 8px;font-weight:700;font-size:17px;color:var(--navy)}
-.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.panel{background:#f6f6f6;width:100%;max-width:520px;height:90vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden}
+.ph{display:flex;align-items:center;gap:4px;padding:12px 14px 6px}
+.ph h2{margin:0 6px 0 4px;flex:1;font-size:26px;font-weight:500;color:#1b1b1b}
+#close{border:0;background:none;font-size:32px;line-height:1;color:#444;cursor:pointer;padding:0 8px}
+.navb{width:40px;height:40px;border:0;border-radius:50%;background:transparent;font:inherit;font-size:30px;line-height:1;color:#1b1b1b;cursor:pointer;padding:0 0 4px}
+.navb:hover:not(:disabled){background:#e4e4e4}
+.navb:disabled{color:#c3c3c3;cursor:default}
+.todayb{width:42px;height:42px;border:2px solid #444;border-radius:9px;background:#fff;font:inherit;font-size:16px;font-weight:700;color:#1b1b1b;cursor:pointer}
+.dow{display:grid;grid-template-columns:repeat(7,1fr);padding:8px 10px 2px;text-align:center}
+.dow span{font-size:13px;font-weight:600;color:#555}
+.months{flex:1;overflow-y:auto;padding:4px 10px 12px;touch-action:pan-y}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px 0;text-align:center}
 .e{display:block}
-.day{aspect-ratio:1/1;min-height:40px;border:0;border-radius:50%;background:transparent;color:var(--ink);font:inherit;font-size:16px;cursor:pointer;padding:0}
-.day:hover:not(:disabled){background:var(--wa2)}
-.day:disabled{color:#c3cbd0;cursor:default}
-.day.today{box-shadow:inset 0 0 0 2px var(--wa)}
-.day.sel{background:var(--wa);color:#fff;font-weight:700}
-.legend{margin:10px 0 0;font-size:13px;color:var(--mute)}
+.day{height:56px;border:0;background:transparent;font:inherit;font-size:18px;color:#1b1b1b;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.day span{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.day:hover:not(:disabled) span{background:#e4e4e4}
+.day:disabled{color:#bdbdbd;cursor:default}
+.day.today span{background:#111;color:#fff}
+.day.sel span{background:var(--wa);color:#fff;font-weight:700}
+.day:focus-visible span{outline:3px solid #9ed8cc;outline-offset:1px}
+.legend{margin:10px 4px 0;font-size:13px;color:#666}
+.mchips{display:flex;gap:8px;overflow-x:auto;padding:10px 12px 14px;background:#fff;border-top:1px solid #e3e3e3}
+.mc{border:0;border-radius:999px;background:#fff;padding:11px 18px;font:inherit;font-size:16px;color:#1b1b1b;cursor:pointer;white-space:nowrap}
+.mc.on{background:#dcdcdc;font-weight:700}
+.yr{align-self:center;font-size:15px;color:#555;padding:0 6px;white-space:nowrap}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -102,10 +111,17 @@ button:focus-visible{outline:3px solid #9ed8cc;outline-offset:2px}
 </main>
 
 <div class="sheet" id="sheet" hidden>
-  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheetT">
-    <div class="ph"><h2 id="sheetT">Select date</h2><button type="button" id="close" aria-label="Close calendar">&times;</button></div>
-    <div class="dow" aria-hidden="true"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>
-    <div class="months" id="months"></div>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <div class="ph">
+      <button type="button" id="close" aria-label="Close calendar">&times;</button>
+      <h2 id="mTitle">Select date</h2>
+      <button type="button" class="navb" id="prevM" aria-label="Previous month">&#8249;</button>
+      <button type="button" class="navb" id="nextM" aria-label="Next month">&#8250;</button>
+      <button type="button" class="todayb" id="todayBtn" aria-label="Go to today"><span id="todayNum"></span></button>
+    </div>
+    <div class="dow" aria-hidden="true"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+    <div class="months" id="months" aria-live="polite"></div>
+    <div class="mchips" id="mchips" role="group" aria-label="Months"></div>
   </div>
 </div>
 <script src="/pick/app.js"></script>
@@ -145,32 +161,57 @@ const JS = `(function () {
   function msgOf(res, json) { return (json && json.error && json.error.message) || (res.status === 429 ? 'Too many tries. Please wait a moment.' : 'Something went wrong. Please try again.'); }
   function codeOf(json) { return json && json.error && json.error.code; }
 
-  /* ---------- calendar sheet: this month and every month up to the booking limit ---------- */
-  function renderMonths() {
-    var a = parseKey(info.minDate), z = parseKey(info.maxDate);
-    var y = a.y, m = a.m, html = '';
-    while (y < z.y || (y === z.y && m <= z.m)) {
-      var first = new Date(Date.UTC(y, m, 1)).getUTCDay();
-      var count = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
-      html += '<div class="mt">' + MONTHS[m] + ' ' + y + '</div><div class="grid">';
-      for (var i = 0; i < first; i++) html += '<span class="e"></span>';
-      for (var d = 1; d <= count; d++) {
-        var k = key(y, m, d);
-        var off = k < info.minDate || k > info.maxDate || unavailable[k] === true;
-        html += '<button type="button" class="day' + (k === sel.date ? ' sel' : '') + (k === info.minDate ? ' today' : '') + '"' + (off ? ' disabled' : '') +
-          ' data-k="' + k + '" aria-label="' + DAYS[dow(k)] + ' ' + d + ' ' + MONTHS[m] + ' ' + y + (off ? ', not available' : '') + '">' + d + '</button>';
-      }
-      html += '</div>';
-      m += 1; if (m > 11) { m = 0; y += 1; }
+  /* ---------- calendar sheet: one month at a time, month chips at the bottom, swipe left / right ---------- */
+  var view = { y: 0, m: 0 };
+  function monthList() {
+    var a = parseKey(info.minDate), z = parseKey(info.maxDate), out = [], y = a.y, m = a.m;
+    while (y < z.y || (y === z.y && m <= z.m)) { out.push({ y: y, m: m }); m += 1; if (m > 11) { m = 0; y += 1; } }
+    return out;
+  }
+  function renderChips() {
+    var list = monthList(), html = '', prevY = null, i, it, on;
+    for (i = 0; i < list.length; i++) {
+      it = list[i];
+      if (prevY !== null && it.y !== prevY) html += '<span class="yr">' + it.y + '</span>';
+      prevY = it.y;
+      on = it.y === view.y && it.m === view.m;
+      html += '<button type="button" class="mc' + (on ? ' on' : '') + '" data-y="' + it.y + '" data-m="' + it.m + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + MONTHS[it.m].slice(0, 3) + '</button>';
     }
-    html += '<p class="legend">Greyed days are closed or fully booked.</p>';
-    $('months').innerHTML = html;
+    $('mchips').innerHTML = html;
+    var cur = $('mchips').querySelector('.mc.on');
+    if (cur && cur.scrollIntoView) cur.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }
+  function renderMonth() {
+    var y = view.y, m = view.m, html = '', i, d, k, off;
+    var first = new Date(Date.UTC(y, m, 1)).getUTCDay();
+    var count = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    $('mTitle').textContent = MONTHS[m] + (y !== parseKey(info.minDate).y ? ' ' + y : '');
+    for (i = 0; i < first; i++) html += '<span class="e"></span>';
+    for (d = 1; d <= count; d++) {
+      k = key(y, m, d);
+      off = k < info.minDate || k > info.maxDate || unavailable[k] === true;
+      html += '<button type="button" class="day' + (k === sel.date ? ' sel' : '') + (k === info.minDate ? ' today' : '') + '"' + (off ? ' disabled' : '') +
+        ' data-k="' + k + '" aria-label="' + DAYS[dow(k)] + ' ' + d + ' ' + MONTHS[m] + ' ' + y + (off ? ', not available' : '') + '"><span>' + d + '</span></button>';
+    }
+    $('months').innerHTML = '<div class="grid">' + html + '</div><p class="legend">Greyed days are closed or fully booked. Swipe left or right for other months.</p>';
+    renderChips();
+    var list = monthList();
+    $('prevM').disabled = list.length === 0 || (list[0].y === view.y && list[0].m === view.m);
+    $('nextM').disabled = list.length === 0 || (list[list.length - 1].y === view.y && list[list.length - 1].m === view.m);
+  }
+  function shiftMonth(delta) {
+    var list = monthList(), idx = -1, i;
+    for (i = 0; i < list.length; i++) if (list[i].y === view.y && list[i].m === view.m) idx = i;
+    var n = idx + delta;
+    if (idx < 0 || n < 0 || n >= list.length) return;
+    view.y = list[n].y; view.m = list[n].m; renderMonth();
   }
   function openSheet() {
-    renderMonths();
+    var base = parseKey(sel.date || info.minDate);
+    view.y = base.y; view.m = base.m;
+    $('todayNum').textContent = parseKey(info.minDate).d;
+    renderMonth();
     $('sheet').hidden = false;
-    var s = $('months').querySelector('.day.sel') || $('months').querySelector('.day:not(:disabled)');
-    if (s && s.scrollIntoView) s.scrollIntoView({ block: 'center' });
     $('close').focus();
   }
   function closeSheet() { $('sheet').hidden = true; $('dateBtn').focus(); }
@@ -221,6 +262,21 @@ const JS = `(function () {
     var b = ev.target.closest ? ev.target.closest('button[data-k]') : null;
     if (b && !b.disabled) chooseDate(b.getAttribute('data-k'));
   });
+  $('mchips').addEventListener('click', function (ev) {
+    var b = ev.target.closest ? ev.target.closest('button[data-m]') : null;
+    if (!b) return;
+    view.y = +b.getAttribute('data-y'); view.m = +b.getAttribute('data-m'); renderMonth();
+  });
+  $('prevM').addEventListener('click', function () { shiftMonth(-1); });
+  $('nextM').addEventListener('click', function () { shiftMonth(1); });
+  $('todayBtn').addEventListener('click', function () { var t = parseKey(info.minDate); view.y = t.y; view.m = t.m; renderMonth(); });
+  var touchX = null;
+  $('months').addEventListener('touchstart', function (ev) { touchX = ev.changedTouches && ev.changedTouches[0] ? ev.changedTouches[0].clientX : null; }, { passive: true });
+  $('months').addEventListener('touchend', function (ev) {
+    if (touchX === null || !ev.changedTouches || !ev.changedTouches[0]) return;
+    var dx = ev.changedTouches[0].clientX - touchX; touchX = null;
+    if (dx < -60) shiftMonth(1); else if (dx > 60) shiftMonth(-1);
+  }, { passive: true });
   $('chips').addEventListener('click', function (ev) {
     var b = ev.target.closest ? ev.target.closest('button[data-t]') : null;
     if (!b || b.disabled) return;
