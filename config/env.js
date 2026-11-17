@@ -56,6 +56,26 @@ const env = {
   // Public https address of this server. On Railway it is detected from RAILWAY_PUBLIC_DOMAIN.
   PUBLIC_BASE_URL: (process.env.PUBLIC_BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '')).replace(/\/$/, ''),
 
+  // ---- Meeting slots (used by the "Pick date and time" page) ----
+  // A meeting of BOOKING_MEETING_MINUTES blocks that time PLUS BOOKING_BUFFER_MINUTES, so a meeting that
+  // runs over (10:00-10:30 going on to 10:40) never collides with the next customer.
+  BOOKING_SLOTS: toBool(process.env.BOOKING_SLOTS, true), // false = any exact time is accepted (old behaviour)
+  BOOKING_DAY_START: (process.env.BOOKING_DAY_START || '10:00').trim(), // first meeting starts at
+  BOOKING_DAY_END: (process.env.BOOKING_DAY_END || '18:00').trim(), // every meeting must END by
+  BOOKING_SLOT_MINUTES: toInt(process.env.BOOKING_SLOT_MINUTES, 30), // distance between start times
+  BOOKING_MEETING_MINUTES: toInt(process.env.BOOKING_MEETING_MINUTES, toInt(process.env.BOOKING_SLOT_MINUTES, 30)),
+  BOOKING_BUFFER_MINUTES: toInt(process.env.BOOKING_BUFFER_MINUTES, 15),
+  BOOKING_WORKDAYS: (process.env.BOOKING_WORKDAYS || '1,2,3,4,5,6') // 0 = Sunday ... 6 = Saturday
+    .split(',')
+    .map((x) => parseInt(x, 10))
+    .filter((n) => n >= 0 && n <= 6),
+  BOOKING_CLOSED_DATES: (process.env.BOOKING_CLOSED_DATES || '') // holidays, e.g. 2026-11-19,2026-12-25
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean),
+  BOOKING_CAPACITY: Math.max(1, toInt(process.env.BOOKING_CAPACITY, 1)), // meetings at the same time
+  BOOKING_HOLD_MINUTES: Math.max(5, toInt(process.env.BOOKING_HOLD_MINUTES, 30)), // a chosen slot is kept this long until confirmed
+
   // ---- MSG91 WhatsApp channel ----
   MSG91_ENABLED: toBool(process.env.MSG91_ENABLED, false),
   MSG91_AUTH_KEY: process.env.MSG91_AUTH_KEY || '',
@@ -75,6 +95,19 @@ const env = {
   MSG91_MEDIA_ALLOW_HTTP: toBool(process.env.MSG91_MEDIA_ALLOW_HTTP, false),
 };
 
+env.booking = {
+  enabled: env.BOOKING_SLOTS,
+  start: env.BOOKING_DAY_START,
+  end: env.BOOKING_DAY_END,
+  slot: env.BOOKING_SLOT_MINUTES,
+  meeting: env.BOOKING_MEETING_MINUTES,
+  buffer: env.BOOKING_BUFFER_MINUTES,
+  workdays: env.BOOKING_WORKDAYS,
+  closed: env.BOOKING_CLOSED_DATES,
+  capacity: env.BOOKING_CAPACITY,
+  holdMinutes: env.BOOKING_HOLD_MINUTES,
+};
+
 env.validate = () => {
   const problems = [];
   if (!env.MONGODB_URI) problems.push('MONGODB_URI (or MONGO_URL) is required.');
@@ -84,6 +117,15 @@ env.validate = () => {
     if (!env.MSG91_AUTH_KEY && !env.MSG91_DRY_RUN) problems.push('MSG91_AUTH_KEY is required when MSG91_ENABLED=true.');
     if (!env.MSG91_INTEGRATED_NUMBER) problems.push('MSG91_INTEGRATED_NUMBER is required when MSG91_ENABLED=true (digits with country code, no +).');
     if (isProd && env.MSG91_WEBHOOK_SECRET.length < 16) problems.push('MSG91_WEBHOOK_SECRET (16+ chars) is required in production.');
+  }
+  if (env.BOOKING_SLOTS) {
+    const hm = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (!hm.test(env.BOOKING_DAY_START) || !hm.test(env.BOOKING_DAY_END)) problems.push('BOOKING_DAY_START / BOOKING_DAY_END must look like 10:00 and 18:00 (24-hour HH:MM).');
+    else if (env.BOOKING_DAY_END <= env.BOOKING_DAY_START) problems.push('BOOKING_DAY_END must be later than BOOKING_DAY_START.');
+    if (env.BOOKING_SLOT_MINUTES < 5 || env.BOOKING_MEETING_MINUTES < 5) problems.push('BOOKING_SLOT_MINUTES and BOOKING_MEETING_MINUTES must be at least 5.');
+    if (env.BOOKING_BUFFER_MINUTES < 0) problems.push('BOOKING_BUFFER_MINUTES cannot be negative.');
+    if (!env.BOOKING_WORKDAYS.length) problems.push('BOOKING_WORKDAYS needs at least one day, e.g. 1,2,3,4,5,6 (0 = Sunday).');
+    if (env.BOOKING_CLOSED_DATES.some((d) => !/^\d{4}-\d{2}-\d{2}$/.test(d))) problems.push('BOOKING_CLOSED_DATES must be YYYY-MM-DD dates separated by commas.');
   }
   if (env.DATETIME_PICKER && !env.PUBLIC_BASE_URL) problems.push('DATETIME_PICKER=true needs PUBLIC_BASE_URL (your https address), e.g. https://your-app.up.railway.app');
   if (isProd && env.corsOrigins.includes('*')) problems.push('CORS_ORIGINS must not be "*" in production.');
