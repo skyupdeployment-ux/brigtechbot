@@ -9,6 +9,8 @@ const Booking = require('../models/Booking');
 const BotEngine = require('./flow/engine');
 const botService = require('./botService');
 const tokenService = require('./tokenService');
+const slotService = require('./slotService');
+const slotRules = require('../utils/slots');
 const referenceService = require('./referenceService');
 const activityService = require('./activityService');
 const fileService = require('./fileService');
@@ -35,6 +37,7 @@ const makeCtx = (prefs, bot) => ({
   maxDaysAhead: bot.bookingMaxDaysAhead,
   minLeadMinutes: env.PICKER_MIN_LEAD_MINUTES,
   picker: !!(env.DATETIME_PICKER && env.PUBLIC_BASE_URL),
+  slots: env.DATETIME_PICKER && env.PUBLIC_BASE_URL && env.booking.enabled ? env.booking : null,
   now: () => nowIn(prefs.timezone),
 });
 
@@ -172,14 +175,23 @@ async function createEnquiry(c) {
 
 /* ---------------- persist one turn ---------------- */
 async function commit(c, userDocs, { req, socketId } = {}) {
-  const { conv, bot, prefs, engine } = c;
+  const { conv, bot, prefs, engine, ctx } = c;
+  const hadSlot = !!(conv.state && conv.state.timeLocal); // did the customer hold a slot before this turn?
 
   // 1) effects that need the database (only COMPLETE does)
   let created = null;
   for (const eff of engine.effects.slice()) {
     if (eff.type === 'COMPLETE') {
+      const snap = engine.snapshot();
+      const slotted = !!(ctx.slots && snap.startsAt);
+      if (slotted && !(await slotService.verifyHold(conv._id, snap.startsAt))) {
+        // the slot was released (held too long) and may be gone: no enquiry yet, ask for another time
+        engine.reopenBooking('Sorry, that time is no longer available. Please choose another time.');
+        continue;
+      }
       created = await createEnquiry(c);
       engine.completeWith(created.enquiry.reference);
+      if (slotted) await slotService.bookHold(conv._id, snap.startsAt, created.enquiry._id);
     }
   }
 
@@ -202,6 +214,8 @@ async function commit(c, userDocs, { req, socketId } = {}) {
   if (docs.length) conv.lastMessageAt = new Date();
   conv.lastActivityAt = new Date();
   await conv.save();
+  // the customer started again / cancelled / went back: give their held slot back
+  if (ctx.slots && hadSlot && !engine.S.timeLocal) await slotService.releaseHeld(conv._id);
 
   // 4) audit trail (best effort)
   const base = { user: conv.user, actor: c.actor && c.actor._id, conversation: conv._id, req };
@@ -387,27 +401,36 @@ async function submitDateTime(id, linkCount, body, ctx) {
   if (!owner) throw AppError.notFound('This link is no longer valid.', 'USER_NOT_FOUND');
   return withConversation(id, owner, async (c) => {
     if ((c.engine.S.submissions || 0) !== linkCount) throw AppError.conflict('This link has expired. Please use the newest message in WhatsApp.', 'LINK_EXPIRED');
-    const res = c.engine.selectDateTime(body.date, body.time);
-    if (res.error) {
-      const status = res.error.code === 'DATE_NOT_EXPECTED' ? 409 : 422;
-      throw new AppError(status, res.error.code, res.error.message);
+    const check = c.engine.checkDateTime(body.date, body.time);
+    if (check.error) {
+      const status = check.error.code === 'DATE_NOT_EXPECTED' ? 409 : 422;
+      throw new AppError(status, check.error.code, check.error.message);
     }
+    if (c.ctx.slots) await slotService.reserve(c.conv._id, check.dt.toUTC().toJSDate()); // SLOT_TAKEN if someone was first
+    const res = c.engine.selectDateTime(body.date, body.time);
     const result = await commit(c, [{ role: 'user', kind: 'choice', text: res.label, desc: res.desc }], ctx);
     result.delivery = { channel: c.conv.channel, waNumber: owner.waNumber || null };
     return result;
   });
 }
 
-/** What the picker page needs to show: server time, allowed range, and whether the link is still usable. */
-async function pickerInfo(id, linkCount) {
+/** Loads what the picker page needs about a conversation (shared by info + slots). */
+async function pickerContext(id, linkCount) {
   const conv = await Conversation.findById(id);
   if (!conv) throw AppError.notFound('This link is no longer valid.', 'CONVERSATION_NOT_FOUND');
   const bot = await botService.getById(conv.bot);
   const prefs = prefsOf(conv, bot);
   const ctx = makeCtx(prefs, bot);
   const engine = BotEngine.fromStored(conv.state, ctx);
-  const now = ctx.now();
   const active = engine.isActive() && engine.S.flow === '__sched2' && (engine.S.submissions || 0) === linkCount;
+  return { conv, bot, prefs, ctx, engine, active, now: ctx.now() };
+}
+
+/** What the picker page needs to show: server time, the calendar range, closed / full days, and whether the link is usable. */
+async function pickerInfo(id, linkCount) {
+  const { bot, prefs, ctx, engine, active, now } = await pickerContext(id, linkCount);
+  const maxDate = now.plus({ days: bot.bookingMaxDaysAhead }).toISODate();
+  const cfg = env.booking;
   return {
     active,
     reason: active ? null : engine.S.flow === '__confirm' || (engine.S.submissions || 0) > linkCount ? 'already_saved' : 'expired',
@@ -415,9 +438,32 @@ async function pickerInfo(id, linkCount) {
     epochMs: now.toMillis(),
     nowLine: require('../utils/time').formatNowLine(prefs.timezone),
     minDate: now.toISODate(),
-    maxDate: now.plus({ days: bot.bookingMaxDaysAhead }).toISODate(),
+    maxDate,
     minLeadMinutes: ctx.minLeadMinutes,
     utcOffsetMinutes: now.offset,
+    slotMode: !!ctx.slots,
+    meetingMinutes: cfg.meeting,
+    unavailable: active ? await slotService.unavailableDates(now.toISODate(), maxDate, prefs.timezone, now, ctx.minLeadMinutes) : [],
+  };
+}
+
+/** The times of ONE date, each marked available or not. */
+async function pickerSlots(id, linkCount, dateKey) {
+  const { bot, prefs, ctx, active, now } = await pickerContext(id, linkCount);
+  if (!active) throw AppError.conflict('This link is no longer active.', 'LINK_EXPIRED');
+  const dt = DateTime.fromISO(String(dateKey), { zone: prefs.timezone });
+  if (!dt.isValid) throw AppError.unprocessable('That is not a valid date.', 'INVALID_DATE');
+  if (dt.toISODate() < now.toISODate() || dt.toISODate() > now.plus({ days: bot.bookingMaxDaysAhead }).toISODate()) {
+    return { date: dt.toISODate(), open: false, slots: [], message: 'Please choose a date inside the calendar.' };
+  }
+  await slotService.purgeExpired();
+  const day = await slotService.dayAvailability(dt.toISODate(), prefs.timezone, now, ctx.minLeadMinutes);
+  const anyFree = day.slots.some((x) => x.available);
+  return {
+    date: dt.toISODate(),
+    open: day.open,
+    slots: day.slots,
+    message: !day.open ? 'We are closed on this day.' : anyFree ? null : 'No times are left on this day. Please choose another date.',
   };
 }
 
@@ -466,10 +512,11 @@ async function remove(id, actor, req) {
     const keepNames = new Set(await Enquiry.distinct('attachments.storedName', { conversation: conv._id }));
     const names = await Message.distinct('file.storedName', { conversation: conv._id, 'file.storedName': { $ne: null } });
     await Message.deleteMany({ conversation: conv._id });
+    await slotService.releaseHeld(conv._id);
     await conv.deleteOne();
     await fileService.remove(names.filter((n) => !keepNames.has(n))); // files attached to submitted enquiries stay
     await activityService.log('conversation_deleted', { user: conv.user, actor: actor._id, meta: { conversation: id }, req });
   });
 }
 
-module.exports = { submitDateTime, pickerInfo, createConversation, startOrResume, getOne, listMessages, list, sendMessage, sendFiles, selectDate, idle, restart, updatePreferences, remove };
+module.exports = { submitDateTime, pickerInfo, pickerSlots, createConversation, startOrResume, getOne, listMessages, list, sendMessage, sendFiles, selectDate, idle, restart, updatePreferences, remove };
