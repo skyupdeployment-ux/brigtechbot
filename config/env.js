@@ -103,6 +103,26 @@ const env = {
   MSG91_MEDIA_ALLOW_HTTP: toBool(process.env.MSG91_MEDIA_ALLOW_HTTP, false),
 };
 
+env.VERSION = 'wa-slots-v6';
+env.PUBLIC_BASE_URL_EXPLICIT = !!process.env.PUBLIC_BASE_URL; // typed in by hand (never overridden)
+env.DATETIME_PICKER_EXPLICIT = process.env.DATETIME_PICKER !== undefined && process.env.DATETIME_PICKER !== '';
+
+/**
+ * The bot learns its own public address from a message MSG91 sends it (the request is authenticated by the
+ * webhook secret, so the address it arrived on is the live one). That switches the calendar on with no settings.
+ * Returns true when the address changed.
+ */
+env.learnPublicAddress = (host) => {
+  if (env.PUBLIC_BASE_URL_EXPLICIT) return false;
+  const h = String(host || '').split(',')[0].trim().toLowerCase();
+  if (!/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d+)?$/.test(h) || /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.)/.test(h)) return false;
+  const url = `https://${h}`;
+  if (env.PUBLIC_BASE_URL === url) return false;
+  env.PUBLIC_BASE_URL = url;
+  if (!env.DATETIME_PICKER_EXPLICIT) env.DATETIME_PICKER = true;
+  return true;
+};
+
 env.booking = {
   enabled: env.BOOKING_SLOTS,
   start: env.BOOKING_DAY_START,
