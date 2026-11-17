@@ -16,9 +16,26 @@ const safeEqual = (a, b) => {
 exports.inbound = (req, res, next) => {
   if (!env.MSG91_ENABLED) return next(AppError.notFound('MSG91 channel is disabled', 'CHANNEL_DISABLED'));
 
+  let trusted = false;
   if (env.MSG91_WEBHOOK_SECRET) {
-    const given = req.query.secret || req.get('x-webhook-secret') || '';
-    if (!given || !safeEqual(given, env.MSG91_WEBHOOK_SECRET)) return next(AppError.unauthorized('Invalid webhook secret', 'INVALID_WEBHOOK_SECRET'));
+    const viaQuery = typeof req.query.secret === 'string' ? req.query.secret : '';
+    const viaHeader = req.get('x-webhook-secret') || '';
+    const given = (viaQuery || viaHeader).trim();
+    if (!given || !safeEqual(given, env.MSG91_WEBHOOK_SECRET.trim())) {
+      // Diagnostics only: lengths and header NAMES, never the secret itself.
+      logger.warn(
+        `MSG91 webhook 401: secret via ${viaQuery ? 'url' : viaHeader ? 'header' : 'NOTHING'}, ` +
+          `received length ${given.length}, expected length ${env.MSG91_WEBHOOK_SECRET.trim().length}, ` +
+          `headers received: ${Object.keys(req.headers).join(',')}`
+      );
+      return next(AppError.unauthorized('Invalid webhook secret', 'INVALID_WEBHOOK_SECRET'));
+    }
+    trusted = true;
+  }
+
+  // Only a request that proved the secret may tell us our public address (the Pick date calendar needs it).
+  if (trusted && env.learnPublicAddress(req.get('x-forwarded-host') || req.get('host'))) {
+    logger.info(`Public address learned from MSG91: ${env.PUBLIC_BASE_URL} (calendar ${env.DATETIME_PICKER ? 'ON' : 'OFF'})`);
   }
 
   // Acknowledge immediately so MSG91 never times out / retries; process in the background.
