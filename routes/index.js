@@ -17,7 +17,7 @@ router.get('/health', (_req, res) =>
     status: 'ok',
     db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     uptime: process.uptime(),
-    version: 'wa-slots-v5',
+    version: env.VERSION,
     commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
     calendar: !!(env.DATETIME_PICKER && env.PUBLIC_BASE_URL), // true = customers get the Pick date calendar
   })
