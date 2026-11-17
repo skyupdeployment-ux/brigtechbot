@@ -73,6 +73,7 @@ async function update(id, body, actor, req) {
   if (body.timeSlot !== undefined) booking.timeSlot = body.timeSlot;
   if (body.status !== undefined) booking.status = body.status;
   await booking.save();
+  if (booking.status === 'cancelled') await require('./slotService').releaseForEnquiry(booking.enquiry); // the time becomes free again
 
   await activityService.log('booking_updated', { user: booking.user, actor: actor._id, conversation: booking.conversation, enquiry: booking.enquiry, meta: body, req });
   return serializers.booking(booking, { timezone: actor.timezone, timeFormat: actor.timeFormat });
@@ -82,6 +83,7 @@ async function remove(id, actor, req) {
   const booking = await load(id, actor);
   if (!isAdmin(actor) && booking.status !== 'requested') throw AppError.conflict('This booking can no longer be deleted.', 'BOOKING_LOCKED');
   await booking.deleteOne();
+  await require('./slotService').releaseForEnquiry(booking.enquiry); // the time becomes free again
   await Enquiry.updateOne({ _id: booking.enquiry }, { $set: { updatedAt: new Date() } });
   await activityService.log('booking_deleted', { user: booking.user, actor: actor._id, conversation: booking.conversation, enquiry: booking.enquiry, req });
 }
