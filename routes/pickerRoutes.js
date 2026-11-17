@@ -8,6 +8,7 @@ const v = require('../validators');
 router.get('/app.js', c.script); // keep above /:token
 router.get('/:token', c.page);
 router.get('/:token/info', c.info);
+router.get('/:token/slots', c.slots);
 router.post('/:token/submit', validate(v.pickDateTime), c.submit);
 
 module.exports = router;
