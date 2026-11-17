@@ -1,9 +1,9 @@
 'use strict';
 
 /* The page opened from the WhatsApp "Pick date and time" button (HTML + its script, served by routes/pickerRoutes.js).
- *   1. "Pick date" button -> a calendar sheet with this month AND the next months (tap a day)
- *   2. the free time slots of that day (booked ones are greyed out)
- *   3. Save
+ *   - an inline month calendar (round < > buttons, tap a day)
+ *   - "Selected date" and a time row: Hour / Minute / AM-PM dropdowns that list ONLY the free times, plus "Earliest"
+ *   - "Confirm date and time"
  * The script is a separate file (/pick/app.js) because the site's security policy only allows scripts from itself.
  * NOTE: the script text below must not contain backticks, "${" or backslashes (it lives inside a template string). */
 
@@ -13,68 +13,47 @@ const HTML = `<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Pick your date and time - Brightech Group</title>
+<title>Pick date and time - Brightech Group</title>
 <style>
-:root{--navy:#0d2b45;--wa:#008069;--wa2:#dff5ec;--ink:#111b21;--mute:#5b6b75;--line:#d1d7db;--bg:#eef1f3;--err:#c0392b}
+:root{--navy:#0d2b45;--wa:#008069;--tint:#e6f0eb;--ink:#17211c;--mute:#5f6b65;--line:#d3dad6;--bg:#f1f3f2;--err:#c0392b}
 *{box-sizing:border-box}
 body{margin:0;font:16px/1.5 "Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--ink)}
-header{background:var(--navy);color:#fff;padding:16px 20px;font-weight:700;font-size:18px}
-main{max-width:460px;margin:0 auto;padding:18px 14px 40px}
-.card{background:#fff;border-radius:16px;padding:20px 16px;box-shadow:0 1px 3px rgba(11,20,26,.12)}
-h1{margin:0 0 4px;font-size:21px;line-height:1.25;color:var(--navy)}
-.now{margin:0 0 16px;color:var(--mute);font-size:15px}
-.now b{color:var(--ink);font-variant-numeric:tabular-nums}
-.lab{margin:16px 0 8px;font-weight:700;font-size:14px;color:var(--navy)}
-.pick{width:100%;display:flex;align-items:center;gap:12px;text-align:left;padding:14px;border:1.5px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);font:inherit;font-size:17px;cursor:pointer}
-.pick.set{border-color:var(--wa);background:var(--wa2);font-weight:600}
-.pick .ic{font-size:22px}
-.pick .tx{flex:1}
-.pick .chev{color:var(--mute);font-size:24px;line-height:1}
-.chips{display:flex;flex-wrap:wrap;gap:8px}
-.chip{border:1.5px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);font:inherit;font-size:15px;padding:10px 15px;cursor:pointer;min-width:92px}
-.chip:hover:not(:disabled){border-color:var(--wa)}
-.chip:disabled{cursor:default;color:#9aa6ad;background:#f3f5f6}
-.chip.taken{text-decoration:line-through}
-.chip.sel{background:var(--wa);border-color:var(--wa);color:#fff;font-weight:700}
-.note{margin:0 0 8px;color:var(--mute);font-size:14px}
-.hint{margin:10px 0 0;font-size:13px;color:var(--mute)}
-.sum{margin:16px 0 0;padding:10px 12px;border-radius:10px;background:var(--bg);font-size:15px;min-height:42px}
-.sum b{color:var(--navy)}
-.err{min-height:22px;margin-top:10px;color:var(--err);font-size:14px}
-#save{width:100%;margin-top:12px;padding:15px;border:0;border-radius:12px;background:var(--wa);color:#fff;font:inherit;font-weight:700;font-size:17px;cursor:pointer}
-#save:disabled{opacity:.5;cursor:default}
-button:focus-visible{outline:3px solid #9ed8cc;outline-offset:2px}
-.ok{text-align:center;padding:14px 8px}
-.ok .tick{width:64px;height:64px;border-radius:50%;background:var(--wa2);color:var(--wa);display:grid;place-items:center;margin:0 auto 12px;font-size:34px;font-weight:700}
-.ok h2{margin:0 0 6px;font-size:21px;color:var(--navy)}
-.ok p{margin:4px 0;color:var(--mute)}
-/* calendar sheet (Google-Calendar style: one month, big days, month chips at the bottom) */
-.sheet{position:fixed;inset:0;background:rgba(11,20,26,.5);display:flex;align-items:flex-end;justify-content:center;z-index:10}
-.panel{background:#f6f6f6;width:100%;max-width:520px;height:90vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden}
-.ph{display:flex;align-items:center;gap:4px;padding:12px 14px 6px}
-.ph h2{margin:0 6px 0 4px;flex:1;font-size:26px;font-weight:500;color:#1b1b1b}
-#close{border:0;background:none;font-size:32px;line-height:1;color:#444;cursor:pointer;padding:0 8px}
-.navb{width:40px;height:40px;border:0;border-radius:50%;background:transparent;font:inherit;font-size:30px;line-height:1;color:#1b1b1b;cursor:pointer;padding:0 0 4px}
-.navb:hover:not(:disabled){background:#e4e4e4}
-.navb:disabled{color:#c3c3c3;cursor:default}
-.todayb{width:42px;height:42px;border:2px solid #444;border-radius:9px;background:#fff;font:inherit;font-size:16px;font-weight:700;color:#1b1b1b;cursor:pointer}
-.dow{display:grid;grid-template-columns:repeat(7,1fr);padding:8px 10px 2px;text-align:center}
-.dow span{font-size:13px;font-weight:600;color:#555}
-.months{flex:1;overflow-y:auto;padding:4px 10px 12px;touch-action:pan-y}
-.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px 0;text-align:center}
+header{background:var(--navy);color:#fff;padding:14px 20px;font-weight:700;font-size:17px}
+main{max-width:460px;margin:0 auto;padding:16px 12px 40px}
+.card{background:#fff;border:1px solid #e3e7e5;border-radius:18px;padding:20px 16px}
+h1{margin:0 0 2px;font-size:21px;line-height:1.25;color:var(--ink)}
+.now{margin:0 0 14px;color:var(--mute);font-size:14.5px}
+.ch{display:flex;align-items:center;justify-content:space-between;margin:6px 0 8px}
+.mt{font-weight:700;font-size:17px}
+.nv{width:46px;height:46px;border:0;border-radius:50%;background:var(--tint);color:var(--ink);font:inherit;font-size:28px;line-height:1;padding:0 0 4px;cursor:pointer}
+.nv:disabled{background:#f1f3f2;color:#c3c9c5;cursor:default}
+.dow{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center;margin-bottom:4px}
+.dow span{font-size:13px;color:var(--mute)}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 .e{display:block}
-.day{height:56px;border:0;background:transparent;font:inherit;font-size:18px;color:#1b1b1b;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
-.day span{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center}
-.day:hover:not(:disabled) span{background:#e4e4e4}
-.day:disabled{color:#bdbdbd;cursor:default}
-.day.today span{background:#111;color:#fff}
-.day.sel span{background:var(--wa);color:#fff;font-weight:700}
-.day:focus-visible span{outline:3px solid #9ed8cc;outline-offset:1px}
-.legend{margin:10px 4px 0;font-size:13px;color:#666}
-.mchips{display:flex;gap:8px;overflow-x:auto;padding:10px 12px 14px;background:#fff;border-top:1px solid #e3e3e3}
-.mc{border:0;border-radius:999px;background:#fff;padding:11px 18px;font:inherit;font-size:16px;color:#1b1b1b;cursor:pointer;white-space:nowrap}
-.mc.on{background:#dcdcdc;font-weight:700}
-.yr{align-self:center;font-size:15px;color:#555;padding:0 6px;white-space:nowrap}
+.day{height:44px;border:0;border-radius:12px;background:var(--tint);color:var(--ink);font:inherit;font-size:16px;font-weight:500;cursor:pointer;padding:0}
+.day:hover:not(:disabled){background:#d4e6dd}
+.day:disabled{background:transparent;color:#b9c0bc;font-weight:400;cursor:default}
+.day.today{box-shadow:inset 0 0 0 2px var(--ink)}
+.day.sel{background:var(--wa);color:#fff;font-weight:700}
+.sep{height:1px;background:#e6eae8;margin:16px 0 12px}
+.lab{font-size:14px;color:var(--mute)}
+.val{font-size:19px;font-weight:700;margin-top:2px}
+.trow{display:flex;gap:8px;margin-top:8px}
+select{flex:1;min-width:0;height:48px;border:1.5px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);font:inherit;font-size:17px;padding:0 8px}
+select:disabled{background:#f4f6f5;color:#a2aaa6}
+select:focus-visible,button:focus-visible{outline:3px solid #9ed8cc;outline-offset:2px}
+.early{flex:0 0 auto;height:48px;padding:0 14px;border:1.5px solid var(--line);border-radius:12px;background:#f4f6f5;color:var(--ink);font:inherit;font-size:15px;cursor:pointer}
+.early:disabled{color:#a2aaa6;cursor:default}
+.note{margin:8px 0 0;color:var(--mute);font-size:13.5px}
+.sum{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:var(--bg);font-size:15px}
+.err{min-height:22px;margin-top:10px;color:var(--err);font-size:14px}
+#save{width:100%;margin-top:6px;padding:15px;border:0;border-radius:14px;background:var(--wa);color:#fff;font:inherit;font-weight:700;font-size:17px;cursor:pointer}
+#save:disabled{background:#9dbdb2;cursor:default}
+.ok{text-align:center;padding:16px 8px}
+.ok .tick{width:64px;height:64px;border-radius:50%;background:var(--tint);color:var(--wa);display:grid;place-items:center;margin:0 auto 12px;font-size:34px;font-weight:700}
+.ok h2{margin:0 0 6px;font-size:21px}
+.ok p{margin:4px 0;color:var(--mute)}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -82,24 +61,34 @@ button:focus-visible{outline:3px solid #9ed8cc;outline-offset:2px}
 <header>Brightech Group</header>
 <main>
   <div class="card" id="form">
-    <h1>Pick your date and time</h1>
+    <h1>Pick date and time</h1>
     <p class="now" id="now">Loading...</p>
 
-    <div class="lab">1. Date</div>
-    <button type="button" class="pick" id="dateBtn" aria-haspopup="dialog">
-      <span class="ic" aria-hidden="true">&#128197;</span><span class="tx" id="dateTxt">Pick date</span><span class="chev" aria-hidden="true">&#8250;</span>
-    </button>
-
-    <div id="timeStep" hidden>
-      <div class="lab">2. Time</div>
-      <p class="note" id="slotMsg"></p>
-      <div class="chips" id="chips" role="group" aria-label="Choose a time"></div>
-      <p class="hint" id="meet"></p>
+    <div class="ch">
+      <button type="button" class="nv" id="prevM" aria-label="Previous month">&#8249;</button>
+      <div class="mt" id="mTitle" aria-live="polite"></div>
+      <button type="button" class="nv" id="nextM" aria-label="Next month">&#8250;</button>
     </div>
+    <div class="dow" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+    <div class="grid" id="cal" role="group" aria-label="Choose a date"></div>
 
-    <div class="sum" id="sum" aria-live="polite">Tap Pick date to start.</div>
+    <div class="sep"></div>
+    <div class="lab">Selected date</div>
+    <div class="val" id="selDate">Tap a date</div>
+
+    <div class="sep"></div>
+    <div class="lab" id="timeLab">Meeting time</div>
+    <div class="trow">
+      <select id="selH" aria-label="Hour" disabled><option value="">Hr</option></select>
+      <select id="selM" aria-label="Minute" disabled><option value="">Min</option></select>
+      <select id="selP" aria-label="AM or PM" disabled><option value="">AM/PM</option></select>
+      <button type="button" class="early" id="early" disabled>Earliest</button>
+    </div>
+    <p class="note" id="slotMsg">Choose a date first. Only free times are listed.</p>
+
+    <div class="sum" id="sum" hidden></div>
     <div class="err" id="err" role="alert"></div>
-    <button type="button" id="save" disabled>Save date and time</button>
+    <button type="button" id="save" disabled>Confirm date and time</button>
   </div>
 
   <div class="card ok" id="done" hidden>
@@ -109,21 +98,6 @@ button:focus-visible{outline:3px solid #9ed8cc;outline-offset:2px}
     <p>You can close this page and go back to WhatsApp. Your enquiry continues there.</p>
   </div>
 </main>
-
-<div class="sheet" id="sheet" hidden>
-  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="mTitle">
-    <div class="ph">
-      <button type="button" id="close" aria-label="Close calendar">&times;</button>
-      <h2 id="mTitle">Select date</h2>
-      <button type="button" class="navb" id="prevM" aria-label="Previous month">&#8249;</button>
-      <button type="button" class="navb" id="nextM" aria-label="Next month">&#8250;</button>
-      <button type="button" class="todayb" id="todayBtn" aria-label="Go to today"><span id="todayNum"></span></button>
-    </div>
-    <div class="dow" aria-hidden="true"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
-    <div class="months" id="months" aria-live="polite"></div>
-    <div class="mchips" id="mchips" role="group" aria-label="Months"></div>
-  </div>
-</div>
 <script src="/pick/app.js"></script>
 </body>
 </html>`;
@@ -136,7 +110,10 @@ const JS = `(function () {
   var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   var info = null, skew = 0, tz = 'Asia/Kolkata', tzShort = 'IST';
   var sel = { date: null, time: null, label: null };
+  var view = { y: 0, m: 0 };
   var unavailable = {};
+  var slots = [];
+  var pick = { h: '', m: '', p: '' };
   var slotsToken = 0;
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -147,54 +124,39 @@ const JS = `(function () {
 
   function clock() {
     var d = new Date(Date.now() + skew);
-    var p = new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz, timeZoneName: 'short' }).formatToParts(d);
+    var p = new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz, timeZoneName: 'short' }).formatToParts(d);
     var g = function (t) { var x = p.filter(function (i) { return i.type === t; })[0]; return x ? x.value : ''; };
     tzShort = g('timeZoneName') || tzShort;
-    $('now').innerHTML = 'Now: <b>' + g('weekday') + ' ' + g('day') + ' ' + g('month') + ' ' + g('year') + ', ' + g('hour') + ':' + g('minute') + ' ' + g('dayPeriod').toUpperCase() + ' (' + tzShort + ')</b>';
+    $('now').textContent = 'Now: ' + g('weekday') + ', ' + g('day') + ' ' + g('month') + ' ' + g('year') + ', ' + g('hour') + ':' + g('minute') + ' ' + g('dayPeriod').toUpperCase() + ' (' + tzShort + ')';
   }
 
   function show(msg) { $('err').textContent = msg || ''; }
   function stop(title, text) {
-    $('sheet').hidden = true; $('form').hidden = true; $('done').hidden = false;
+    $('form').hidden = true; $('done').hidden = false;
     $('doneTitle').textContent = title; $('doneText').textContent = text || '';
   }
   function msgOf(res, json) { return (json && json.error && json.error.message) || (res.status === 429 ? 'Too many tries. Please wait a moment.' : 'Something went wrong. Please try again.'); }
   function codeOf(json) { return json && json.error && json.error.code; }
 
-  /* ---------- calendar sheet: one month at a time, month chips at the bottom, swipe left / right ---------- */
-  var view = { y: 0, m: 0 };
+  /* ---------- calendar: this month, round < > buttons, tap a day, swipe left / right ---------- */
   function monthList() {
     var a = parseKey(info.minDate), z = parseKey(info.maxDate), out = [], y = a.y, m = a.m;
     while (y < z.y || (y === z.y && m <= z.m)) { out.push({ y: y, m: m }); m += 1; if (m > 11) { m = 0; y += 1; } }
     return out;
   }
-  function renderChips() {
-    var list = monthList(), html = '', prevY = null, i, it, on;
-    for (i = 0; i < list.length; i++) {
-      it = list[i];
-      if (prevY !== null && it.y !== prevY) html += '<span class="yr">' + it.y + '</span>';
-      prevY = it.y;
-      on = it.y === view.y && it.m === view.m;
-      html += '<button type="button" class="mc' + (on ? ' on' : '') + '" data-y="' + it.y + '" data-m="' + it.m + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + MONTHS[it.m].slice(0, 3) + '</button>';
-    }
-    $('mchips').innerHTML = html;
-    var cur = $('mchips').querySelector('.mc.on');
-    if (cur && cur.scrollIntoView) cur.scrollIntoView({ inline: 'center', block: 'nearest' });
-  }
-  function renderMonth() {
+  function renderCal() {
     var y = view.y, m = view.m, html = '', i, d, k, off;
     var first = new Date(Date.UTC(y, m, 1)).getUTCDay();
     var count = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
-    $('mTitle').textContent = MONTHS[m] + (y !== parseKey(info.minDate).y ? ' ' + y : '');
+    $('mTitle').textContent = MONTHS[m] + ' ' + y;
     for (i = 0; i < first; i++) html += '<span class="e"></span>';
     for (d = 1; d <= count; d++) {
       k = key(y, m, d);
       off = k < info.minDate || k > info.maxDate || unavailable[k] === true;
       html += '<button type="button" class="day' + (k === sel.date ? ' sel' : '') + (k === info.minDate ? ' today' : '') + '"' + (off ? ' disabled' : '') +
-        ' data-k="' + k + '" aria-label="' + DAYS[dow(k)] + ' ' + d + ' ' + MONTHS[m] + ' ' + y + (off ? ', not available' : '') + '"><span>' + d + '</span></button>';
+        ' data-k="' + k + '" aria-label="' + DAYS[dow(k)] + ' ' + d + ' ' + MONTHS[m] + ' ' + y + (off ? ', not available' : '') + '">' + d + '</button>';
     }
-    $('months').innerHTML = '<div class="grid">' + html + '</div><p class="legend">Greyed days are closed or fully booked. Swipe left or right for other months.</p>';
-    renderChips();
+    $('cal').innerHTML = html;
     var list = monthList();
     $('prevM').disabled = list.length === 0 || (list[0].y === view.y && list[0].m === view.m);
     $('nextM').disabled = list.length === 0 || (list[list.length - 1].y === view.y && list[list.length - 1].m === view.m);
@@ -204,86 +166,103 @@ const JS = `(function () {
     for (i = 0; i < list.length; i++) if (list[i].y === view.y && list[i].m === view.m) idx = i;
     var n = idx + delta;
     if (idx < 0 || n < 0 || n >= list.length) return;
-    view.y = list[n].y; view.m = list[n].m; renderMonth();
+    view.y = list[n].y; view.m = list[n].m; renderCal();
   }
-  function openSheet() {
-    var base = parseKey(sel.date || info.minDate);
-    view.y = base.y; view.m = base.m;
-    $('todayNum').textContent = parseKey(info.minDate).d;
-    renderMonth();
-    $('sheet').hidden = false;
-    $('close').focus();
-  }
-  function closeSheet() { $('sheet').hidden = true; $('dateBtn').focus(); }
 
-  /* ---------- times of the chosen day ---------- */
-  function renderSlots(data) {
-    var html = '', i, s;
-    for (i = 0; i < data.slots.length; i++) {
-      s = data.slots[i];
-      html += '<button type="button" class="chip' + (s.available ? '' : ' taken') + (sel.time === s.time ? ' sel' : '') + '" data-t="' + s.time + '" data-l="' + s.label + '"' + (s.available ? '' : ' disabled') +
-        ' aria-pressed="' + (sel.time === s.time ? 'true' : 'false') + '">' + s.label + '</button>';
-    }
-    $('chips').innerHTML = html;
-    $('slotMsg').textContent = data.message || 'Tap a time. Booked times are crossed out.';
-    $('meet').textContent = info.meetingMinutes ? 'Each meeting is about ' + info.meetingMinutes + ' minutes. Times are in ' + tz + '.' : '';
+  /* ---------- time: Hour / Minute / AM-PM dropdowns that list ONLY free times ---------- */
+  function free() {
+    return slots.filter(function (s) { return s.available; }).map(function (s) {
+      var h = +s.time.slice(0, 2);
+      return { time: s.time, label: s.label, h: String((h % 12) || 12), m: s.time.slice(3), p: h < 12 ? 'AM' : 'PM' };
+    });
   }
+  function uniq(arr) { var out = [], i; for (i = 0; i < arr.length; i++) if (out.indexOf(arr[i]) < 0) out.push(arr[i]); return out; }
+  function fits(x, h, m, p) { return (!h || x.h === h) && (!m || x.m === m) && (!p || x.p === p); }
+  function fill(id, values, current, placeholder) {
+    var html = '<option value="">' + placeholder + '</option>', i;
+    for (i = 0; i < values.length; i++) html += '<option value="' + values[i] + '">' + values[i] + '</option>';
+    $(id).innerHTML = html;
+    $(id).value = values.indexOf(current) >= 0 ? current : '';
+    return $(id).value;
+  }
+  function refreshTime() {
+    var a = free(), on = a.length > 0;
+    // hours: every hour that still has a free time; minutes / AM-PM: only what fits the hour (and minute) already chosen
+    pick.h = fill('selH', uniq(a.map(function (x) { return x.h; })), pick.h, 'Hr');
+    pick.m = fill('selM', uniq(a.filter(function (x) { return fits(x, pick.h, '', ''); }).map(function (x) { return x.m; })).sort(), pick.m, 'Min');
+    pick.p = fill('selP', uniq(a.filter(function (x) { return fits(x, pick.h, pick.m, ''); }).map(function (x) { return x.p; })), pick.p, 'AM/PM');
+    ['selH', 'selM', 'selP', 'early'].forEach(function (id) { $(id).disabled = !on; });
+    var hit = (pick.h && pick.m && pick.p) ? a.filter(function (x) { return fits(x, pick.h, pick.m, pick.p); })[0] : null;
+    sel.time = hit ? hit.time : null; sel.label = hit ? hit.label : null;
+    summary();
+  }
+  function onSelect(which) {
+    var a = free(), v = { h: $('selH').value, m: $('selM').value, p: $('selP').value }, f;
+    pick[which] = v[which];
+    // the dropdown the customer just changed wins: any other choice that no longer fits it is cleared
+    ['h', 'm', 'p'].forEach(function (k) {
+      if (k === which || !pick[k]) return;
+      var t = { h: '', m: '', p: '' }; t[which] = pick[which]; t[k] = pick[k];
+      if (!a.some(function (x) { return fits(x, t.h, t.m, t.p); })) pick[k] = '';
+    });
+    if (pick.h && pick.m && pick.p && !a.some(function (x) { return fits(x, pick.h, pick.m, pick.p); })) {
+      ['h', 'm', 'p'].forEach(function (k) { if (k !== which) pick[k] = ''; });
+    }
+    // when only one choice is left for an empty dropdown, fill it in (hour 10 -> 00 AM)
+    ['m', 'p', 'h'].forEach(function (k) {
+      if (pick[k]) return;
+      var c = uniq(a.filter(function (x) { return fits(x, pick.h, pick.m, pick.p); }).map(function (x) { return x[k]; }));
+      if (c.length === 1) pick[k] = c[0];
+    });
+    show(''); refreshTime();
+  }
+  function summary() {
+    $('selDate').textContent = sel.date ? longDate(sel.date) : 'Tap a date';
+    if (sel.date && sel.time) { $('sum').hidden = false; $('sum').textContent = 'You chose: ' + longDate(sel.date) + ', ' + sel.label + ' (' + tzShort + ')'; }
+    else $('sum').hidden = true;
+    $('save').disabled = !(sel.date && sel.time);
+  }
+
   function loadSlots(k) {
     var mine = ++slotsToken;
-    $('timeStep').hidden = false;
-    $('slotMsg').textContent = 'Loading times...'; $('chips').innerHTML = '';
+    slots = []; pick = { h: '', m: '', p: '' }; sel.time = null; sel.label = null; refreshTime();
+    $('slotMsg').textContent = 'Loading times...';
     fetch('/pick/' + encodeURIComponent(token) + '/slots?date=' + encodeURIComponent(k), { headers: { Accept: 'application/json' } })
       .then(function (r) { return r.json().then(function (j) { return { r: r, j: j }; }); })
       .then(function (o) {
         if (mine !== slotsToken) return;
         if (!o.r.ok) { if (o.r.status === 409 || o.r.status === 403) { stop('This link is no longer active', msgOf(o.r, o.j)); return; } $('slotMsg').textContent = msgOf(o.r, o.j); return; }
-        renderSlots(o.j.data);
+        slots = o.j.data.slots || [];
+        refreshTime();
+        $('slotMsg').textContent = o.j.data.message || ('Only free times are listed. Each meeting is about ' + (info.meetingMinutes || 30) + ' minutes.');
       })
       .catch(function () { if (mine === slotsToken) $('slotMsg').textContent = 'Could not load the times. Please check your connection.'; });
   }
 
-  function summary() {
-    if (sel.date && sel.time) $('sum').innerHTML = 'You chose: <b>' + longDate(sel.date) + ', ' + sel.label + ' (' + tzShort + ')</b>';
-    else $('sum').textContent = sel.date ? 'Now tap a time.' : 'Tap Pick date to start.';
-    $('save').disabled = !(sel.date && sel.time);
-  }
-
   function chooseDate(k) {
-    sel.date = k; sel.time = null; sel.label = null; show('');
-    $('dateTxt').textContent = longDate(k); $('dateBtn').classList.add('set');
-    closeSheet(); summary(); loadSlots(k);
+    sel.date = k; show(''); renderCal(); loadSlots(k);
   }
 
-  $('dateBtn').addEventListener('click', function () { if (info) openSheet(); });
-  $('close').addEventListener('click', closeSheet);
-  $('sheet').addEventListener('click', function (ev) { if (ev.target === $('sheet')) closeSheet(); });
-  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !$('sheet').hidden) closeSheet(); });
-  $('months').addEventListener('click', function (ev) {
+  $('cal').addEventListener('click', function (ev) {
     var b = ev.target.closest ? ev.target.closest('button[data-k]') : null;
     if (b && !b.disabled) chooseDate(b.getAttribute('data-k'));
   });
-  $('mchips').addEventListener('click', function (ev) {
-    var b = ev.target.closest ? ev.target.closest('button[data-m]') : null;
-    if (!b) return;
-    view.y = +b.getAttribute('data-y'); view.m = +b.getAttribute('data-m'); renderMonth();
-  });
   $('prevM').addEventListener('click', function () { shiftMonth(-1); });
   $('nextM').addEventListener('click', function () { shiftMonth(1); });
-  $('todayBtn').addEventListener('click', function () { var t = parseKey(info.minDate); view.y = t.y; view.m = t.m; renderMonth(); });
   var touchX = null;
-  $('months').addEventListener('touchstart', function (ev) { touchX = ev.changedTouches && ev.changedTouches[0] ? ev.changedTouches[0].clientX : null; }, { passive: true });
-  $('months').addEventListener('touchend', function (ev) {
+  $('cal').addEventListener('touchstart', function (ev) { touchX = ev.changedTouches && ev.changedTouches[0] ? ev.changedTouches[0].clientX : null; }, { passive: true });
+  $('cal').addEventListener('touchend', function (ev) {
     if (touchX === null || !ev.changedTouches || !ev.changedTouches[0]) return;
     var dx = ev.changedTouches[0].clientX - touchX; touchX = null;
     if (dx < -60) shiftMonth(1); else if (dx > 60) shiftMonth(-1);
   }, { passive: true });
-  $('chips').addEventListener('click', function (ev) {
-    var b = ev.target.closest ? ev.target.closest('button[data-t]') : null;
-    if (!b || b.disabled) return;
-    sel.time = b.getAttribute('data-t'); sel.label = b.getAttribute('data-l'); show('');
-    var all = $('chips').querySelectorAll('.chip'), i;
-    for (i = 0; i < all.length; i++) { var on = all[i] === b; all[i].classList.toggle('sel', on); all[i].setAttribute('aria-pressed', on ? 'true' : 'false'); }
-    summary();
+  $('selH').addEventListener('change', function () { onSelect('h'); });
+  $('selM').addEventListener('change', function () { onSelect('m'); });
+  $('selP').addEventListener('change', function () { onSelect('p'); });
+  $('early').addEventListener('click', function () {
+    var a = free();
+    if (!a.length) return;
+    pick = { h: a[0].h, m: a[0].m, p: a[0].p }; show(''); refreshTime();
   });
 
   /* ---------- start ---------- */
@@ -298,7 +277,10 @@ const JS = `(function () {
       }
       tz = info.timezone; skew = info.epochMs - Date.now();
       (info.unavailable || []).forEach(function (k) { unavailable[k] = true; });
+      $('timeLab').textContent = 'Meeting time (' + (tz === 'Asia/Kolkata' ? 'India time' : tz) + ')';
+      var t = parseKey(info.minDate); view.y = t.y; view.m = t.m;
       clock(); setInterval(clock, 30000);
+      renderCal(); summary();
     })
     .catch(function () { stop('Could not load', 'Please check your internet connection and open the link again.'); });
 
@@ -311,7 +293,7 @@ const JS = `(function () {
         if (o.r.ok) { stop('Date and time saved', longDate(sel.date) + ', ' + sel.label + ' (' + tzShort + ')'); return; }
         if (codeOf(o.j) === 'SLOT_TAKEN' || o.r.status === 422) {
           // someone else was first (or the time is not allowed): show the fresh list so the customer can pick again
-          show(msgOf(o.r, o.j)); sel.time = null; sel.label = null; summary(); loadSlots(sel.date); return;
+          show(msgOf(o.r, o.j)); loadSlots(sel.date); return;
         }
         if (o.r.status === 409 || o.r.status === 403) { stop('This link is no longer active', msgOf(o.r, o.j)); return; }
         show(msgOf(o.r, o.j)); $('save').disabled = false;
