@@ -10,4 +10,5 @@ module.exports = {
   Activity: require('./Activity'),
   Counter: require('./Counter'),
   InboundEvent: require('./InboundEvent'),
+  SlotLock: require('./SlotLock'),
 };
