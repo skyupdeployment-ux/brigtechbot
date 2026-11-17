@@ -125,6 +125,15 @@ async function handleOne(payload) {
   }
   if (ev.number === env.MSG91_INTEGRATED_NUMBER) return { handled: false, reason: 'own number' };
 
+  if (ev.kind === 'text' && /^bot version$/i.test(ev.text.trim())) {
+    // a quick way to see which code is live, straight from WhatsApp
+    const calendar = !!(env.DATETIME_PICKER && env.PUBLIC_BASE_URL);
+    await client
+      .sendText(ev.number, `Bot version: ${env.VERSION}\nCalendar booking: ${calendar ? 'ON' : 'OFF'}${calendar ? `\nCalendar address: ${env.PUBLIC_BASE_URL}` : ''}`)
+      .catch((e) => logger.warn(`MSG91 send failed: ${e.message}`));
+    return { handled: true, kind: 'version' };
+  }
+
   return withLock(`wa:${ev.number}`, async () => {
     try {
       await InboundEvent.create({ eventId: ev.eventId, number: ev.number });
