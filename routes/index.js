@@ -9,6 +9,7 @@ const { optionalAuth, authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const v = require('../validators');
 const { ok } = require('../utils/response');
+const env = require('../config/env');
 
 // "version" changes whenever the WhatsApp code changes, so you can see which build is really running.
 router.get('/health', (_req, res) =>
@@ -18,6 +19,7 @@ router.get('/health', (_req, res) =>
     uptime: process.uptime(),
     version: 'wa-slots-v5',
     commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
+    calendar: !!(env.DATETIME_PICKER && env.PUBLIC_BASE_URL), // true = customers get the Pick date calendar
   })
 );
 router.get('/time', optionalAuth, validate(v.timeQuery, 'query'), timeController.now);
