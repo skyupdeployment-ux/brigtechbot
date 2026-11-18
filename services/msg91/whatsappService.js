@@ -68,10 +68,12 @@ async function acceptWithoutFile(conv, user, number, name, type, why, payload) {
 }
 
 const CAPTION_MAX = 1024; // WhatsApp's limit for a picture caption
+// MSG91 downloads the picture before delivering it, so the menu must wait a little or it overtakes the picture.
+const IMAGE_GAP_MS = Number(process.env.MSG91_IMAGE_GAP_MS) || 3000;
 
 /**
  * The welcome after "Hi": the poster picture WITH the company text as its caption (one message).
- * The menu follows from the bot as usual.
+ * The menu ("Select Option") follows from the bot as usual, after a short wait so it lands below the picture.
  * - If the text is longer than WhatsApp allows in a caption, the picture goes with a short caption and the text follows separately.
  * - A problem with the picture never blocks the text and the menu (the reason is written to the log).
  */
@@ -79,6 +81,7 @@ async function sendWelcome(number) {
   const intro = String(WELCOME_INTRO || '').trim();
   const fitsCaption = intro.length > 0 && Array.from(intro).length <= CAPTION_MAX;
   let textSent = false;
+  let imageSent = false;
 
   if (!env.PUBLIC_BASE_URL) {
     logger.warn('Welcome picture skipped: the bot does not know its public address yet');
@@ -89,6 +92,7 @@ async function sendWelcome(number) {
         `${env.PUBLIC_BASE_URL}/assets/welcome.jpg`,
         fitsCaption ? intro : 'Brightech Group - The One Point Solutions'
       );
+      imageSent = true;
       textSent = fitsCaption;
     } catch (e) {
       logger.warn(`MSG91 picture send failed (${e.message}) - continuing without the picture`);
@@ -104,6 +108,9 @@ async function sendWelcome(number) {
     }
     if (env.MSG91_SEND_GAP_MS) await sleep(env.MSG91_SEND_GAP_MS);
   }
+
+  // let the picture reach the customer first, then the menu follows below it
+  if (imageSent) await sleep(IMAGE_GAP_MS);
 }
 
 async function findOrCreateConversation(number) {
