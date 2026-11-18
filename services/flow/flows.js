@@ -14,8 +14,10 @@ const { DateTime } = require('luxon');
 const { formatDateShort, formatDateLong } = require('../../utils/time');
 
 /* ---------------- Fixed messages ---------------- */
-const WELCOME =
-  'Hello! 👋 Welcome to Brightech Group.\n\nThank you for contacting us.\n\nWe provide industrial automation, engineering, repair and building solutions.\n\nHow can we assist you today?';
+// Sent after "Hi": the poster picture, then this text, then the menu below.
+const WELCOME_INTRO =
+  'Dear Sir – Good Day!\n\nGreetings from Brightech Industrial Automation Private Limited.\n\nWe provide reliable industrial electronics repair and automation solutions.\n\n⚙️ *OUR SERVICES*\n\n🔧 *PCB REPAIR & SERVICE – ANY BRAND*\n\n🏭 *INDUSTRIAL:*\nAC Drives (VFD), Servo Drives, HMI, PLC-CPU, I/O Modules, Genset Controllers, SMPS Units, Servo Motors, Spindles.\n\n🌱 *WIND & SOLAR:*\nIGBT Stacks, Driver Boards, Communication Boards, Adapter Boards, Industrial Cooling Fans, PLC-CPU & I/O Modules, HMI & Power Supply Units.\n\n🏢 *BUILDING:*\nHVAC & Chilling Unit AC Drives (VFD), DDC Controllers, Temperature Controller Units, all PCB Boards, High-Speed Cooling Fans, Exhaust Fans.\n\n🔌 *NEW AUTOMATION PRODUCTS:*\nSiemens, Allen-Bradley, Mitsubishi, Schneider Electric, ABB, Omron, Delta, Fuji Electric, B&R, Rexroth, Lenze, GE Fanuc.\n\n🌐 https://www.brightech-group.com\n🌐 https://www.boss-mart.com\n\nWarm Regards,\nTeam Brightech Industrial Automation Private Limited';
+const WELCOME = 'How can we assist you today?';
 const INVALID = 'Sorry, that option is not valid. Please select one of the available options.';
 const COMMON =
   'Thank you for contacting Brightech!\n\nYour enquiry details have been collected.\n\nWhat would you like to do next?';
@@ -455,4 +457,4 @@ const GREET = ['hi', 'hello', 'good morning', 'good evening', 'hey', 'hii', 'hai
 
 const REF_CODES = { product: 'PRD', service: 'SVC', auto: 'AUT', robo: 'ROB', bms: 'BMS', career: 'CAR', contact: 'CNT' };
 
-module.exports = { FL, KW, GREET, INVALID, SCHED_TEXT, TIME_SLOTS, REF_CODES, buildDateOptions, infoMsg };
+module.exports = { WELCOME_INTRO, FL, KW, GREET, INVALID, SCHED_TEXT, TIME_SLOTS, REF_CODES, buildDateOptions, infoMsg };
