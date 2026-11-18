@@ -36,15 +36,22 @@ app.use(
   })
 );
 
+const CORS_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
+const CORS_HEADERS = ['Content-Type', 'Authorization', 'X-Socket-Id', 'X-Setup-Key'];
 app.use(
-  cors({
-    origin(origin, cb) {
-      if (!origin || env.corsOrigins.includes('*') || env.corsOrigins.includes(origin)) return cb(null, true);
-      return cb(new Error('CORS_NOT_ALLOWED'));
-    },
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Socket-Id', 'X-Setup-Key'],
-    maxAge: 600,
+  cors((req, cb) => {
+    // A page served by this bot (like the Pick date page) sends its own address as the Origin when it saves:
+    // that is always allowed. Other websites must be listed in CORS_ORIGINS.
+    const origin = req.header('Origin');
+    const host = String(req.get('x-forwarded-host') || req.get('host') || '').split(',')[0].trim().toLowerCase();
+    let ownPage = false;
+    try {
+      ownPage = !!origin && new URL(origin).host.toLowerCase() === host;
+    } catch (_e) {
+      ownPage = false; // not a real address
+    }
+    const allowed = !origin || ownPage || env.corsOrigins.includes('*') || env.corsOrigins.includes(origin);
+    cb(allowed ? null : new Error('CORS_NOT_ALLOWED'), { origin: allowed, methods: CORS_METHODS, allowedHeaders: CORS_HEADERS, maxAge: 600 });
   })
 );
 
