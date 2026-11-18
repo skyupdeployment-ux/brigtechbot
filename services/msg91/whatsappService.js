@@ -67,26 +67,43 @@ async function acceptWithoutFile(conv, user, number, name, type, why, payload) {
   return { handled: true, kind: 'file-fallback', enquiry: result.enquiry };
 }
 
+const CAPTION_MAX = 1024; // WhatsApp's limit for a picture caption
+
 /**
- * The welcome after "Hi": the poster picture, then the company text. The menu follows from the bot as usual.
- * A problem with the picture never blocks the text and the menu (the reason is written to the log).
+ * The welcome after "Hi": the poster picture WITH the company text as its caption (one message).
+ * The menu follows from the bot as usual.
+ * - If the text is longer than WhatsApp allows in a caption, the picture goes with a short caption and the text follows separately.
+ * - A problem with the picture never blocks the text and the menu (the reason is written to the log).
  */
 async function sendWelcome(number) {
-  if (!env.PUBLIC_BASE_URL) logger.warn('Welcome picture skipped: the bot does not know its public address yet');
-  else {
+  const intro = String(WELCOME_INTRO || '').trim();
+  const fitsCaption = intro.length > 0 && Array.from(intro).length <= CAPTION_MAX;
+  let textSent = false;
+
+  if (!env.PUBLIC_BASE_URL) {
+    logger.warn('Welcome picture skipped: the bot does not know its public address yet');
+  } else {
     try {
-      await client.sendImage(number, `${env.PUBLIC_BASE_URL}/assets/welcome.jpg`, 'Brightech Group - The One Point Solutions');
+      await client.sendImage(
+        number,
+        `${env.PUBLIC_BASE_URL}/assets/welcome.jpg`,
+        fitsCaption ? intro : 'Brightech Group - The One Point Solutions'
+      );
+      textSent = fitsCaption;
     } catch (e) {
       logger.warn(`MSG91 picture send failed (${e.message}) - continuing without the picture`);
     }
     if (env.MSG91_SEND_GAP_MS) await sleep(env.MSG91_SEND_GAP_MS);
   }
-  try {
-    await client.sendText(number, WELCOME_INTRO);
-  } catch (e) {
-    logger.warn(`MSG91 welcome text failed: ${e.message}`);
+
+  if (!textSent && intro) {
+    try {
+      await client.sendText(number, intro);
+    } catch (e) {
+      logger.warn(`MSG91 welcome text failed: ${e.message}`);
+    }
+    if (env.MSG91_SEND_GAP_MS) await sleep(env.MSG91_SEND_GAP_MS);
   }
-  if (env.MSG91_SEND_GAP_MS) await sleep(env.MSG91_SEND_GAP_MS);
 }
 
 async function findOrCreateConversation(number) {
@@ -209,7 +226,7 @@ async function handleOne(payload) {
         result = await conversationService.sendMessage(conv._id, user, { type: ev.kind === 'choice' ? 'choice' : 'text', text }, {});
       }
 
-      // "Hi" (or a first message) that brings up the main menu: poster + company text come first
+      // "Hi" (or a first message) that brings up the main menu: poster + company text (one message) come first
       if (ev.kind === 'text' && (GREET.includes(norm(ev.text)) || conv.messageCount === 0) && result.botMessages.some((m) => m.list && /^How can we assist you today\?/.test(m.text || ''))) {
         await sendWelcome(ev.number);
       }
