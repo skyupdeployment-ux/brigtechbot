@@ -18,6 +18,8 @@ const formatter = require('./formatter');
 const media = require('./media');
 const { parseInbound } = require('./parser');
 const BotEngine = require('../flow/engine');
+const { GREET, WELCOME_INTRO } = require('../flow/flows');
+const { norm } = require('../../utils/text');
 const { withLock } = require('../../utils/lock');
 const logger = require('../../utils/logger');
 
@@ -63,6 +65,28 @@ async function acceptWithoutFile(conv, user, number, name, type, why, payload) {
   const result = await conversationService.sendFiles(conv._id, user, [{ originalname: f.name, mimetype: f.mime, size: 0, filename: null }], [], {});
   await deliver(number, result.botMessages);
   return { handled: true, kind: 'file-fallback', enquiry: result.enquiry };
+}
+
+/**
+ * The welcome after "Hi": the poster picture, then the company text. The menu follows from the bot as usual.
+ * A problem with the picture never blocks the text and the menu (the reason is written to the log).
+ */
+async function sendWelcome(number) {
+  if (!env.PUBLIC_BASE_URL) logger.warn('Welcome picture skipped: the bot does not know its public address yet');
+  else {
+    try {
+      await client.sendImage(number, `${env.PUBLIC_BASE_URL}/assets/welcome.jpg`, 'Brightech Group - The One Point Solutions');
+    } catch (e) {
+      logger.warn(`MSG91 picture send failed (${e.message}) - continuing without the picture`);
+    }
+    if (env.MSG91_SEND_GAP_MS) await sleep(env.MSG91_SEND_GAP_MS);
+  }
+  try {
+    await client.sendText(number, WELCOME_INTRO);
+  } catch (e) {
+    logger.warn(`MSG91 welcome text failed: ${e.message}`);
+  }
+  if (env.MSG91_SEND_GAP_MS) await sleep(env.MSG91_SEND_GAP_MS);
 }
 
 async function findOrCreateConversation(number) {
@@ -185,6 +209,10 @@ async function handleOne(payload) {
         result = await conversationService.sendMessage(conv._id, user, { type: ev.kind === 'choice' ? 'choice' : 'text', text }, {});
       }
 
+      // "Hi" (or a first message) that brings up the main menu: poster + company text come first
+      if (ev.kind === 'text' && (GREET.includes(norm(ev.text)) || conv.messageCount === 0) && result.botMessages.some((m) => m.list && /^How can we assist you today\?/.test(m.text || ''))) {
+        await sendWelcome(ev.number);
+      }
       await deliver(ev.number, result.botMessages);
       return { handled: true, kind: ev.kind, enquiry: result.enquiry };
     } catch (e) {
