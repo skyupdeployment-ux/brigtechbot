@@ -5,7 +5,7 @@
  * Endpoint + auth header per MSG91 docs:
  *   POST https://control.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/
  *   header  Authkey: <your authkey>
- *   body    { integrated_number, recipient_number, content_type: 'text' | 'interactive', text | interactive }
+ *   body    { integrated_number, recipient_number, content_type: 'text' | 'interactive' | 'image', text | interactive | image }
  * NOTE: MSG91 only allows free-form messages inside the 24h customer-service window (after the customer
  * has messaged you). Business-initiated messages need an approved template.
  */
@@ -59,7 +59,42 @@ async function post(payload) {
 
 const base = (to) => ({ integrated_number: env.MSG91_INTEGRATED_NUMBER, recipient_number: to });
 
+/**
+ * Picture message. MSG91 passes WhatsApp's own format through, so the first shape below is the expected one;
+ * if MSG91 refuses it (4xx), the next shapes are tried and the one that works is remembered.
+ * If none works, the picture is skipped for 10 minutes (the text and the menu still go out) and the reason is logged.
+ */
+const IMAGE_SHAPES = [
+  (to, link, caption) => ({ ...base(to), content_type: 'image', image: { link, caption } }),
+  (to, link, caption) => ({ ...base(to), content_type: 'image', image: { url: link, caption } }),
+  (to, link, caption) => ({ ...base(to), content_type: 'image', media: { url: link, caption } }),
+  (to, link, caption) => ({ ...base(to), content_type: 'image', url: link, caption }),
+];
+let imageShape = 0;
+let imageOffUntil = 0;
+
+async function sendImage(to, link, caption) {
+  if (Date.now() < imageOffUntil) throw new Error('picture sending is paused after repeated MSG91 errors');
+  let last;
+  for (let i = imageShape; i < IMAGE_SHAPES.length; i += 1) {
+    try {
+      const r = await post(IMAGE_SHAPES[i](to, link, caption));
+      if (i !== imageShape || i > 0) logger.info(`MSG91 accepted the picture message format #${i + 1}`);
+      imageShape = i;
+      return r;
+    } catch (e) {
+      last = e;
+      if (!e.permanent) throw e; // network / server trouble: not a format problem
+      logger.warn(`MSG91 refused picture format #${i + 1}: ${e.message}`);
+    }
+  }
+  imageOffUntil = Date.now() + 10 * 60 * 1000;
+  throw last;
+}
+
 module.exports = {
+  _resetImageState: () => { imageShape = 0; imageOffUntil = 0; }, // for tests
+  sendImage,
   sendText: (to, text) => post({ ...base(to), content_type: 'text', text }),
   sendInteractive: (to, interactive) => post({ ...base(to), content_type: 'interactive', interactive }),
 };
