@@ -53,6 +53,11 @@ if (env.NODE_ENV !== 'test') app.use(morgan(env.isProd ? 'combined' : 'dev'));
 app.use(express.json({ limit: '50kb' }));
 app.use(sanitize);
 
+// the welcome poster (WhatsApp downloads it from this address)
+app.get('/assets/welcome.jpg', (_req, res) => {
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.type('image/jpeg').send(require('./services/welcomeImage').welcomeJpg);
+});
 app.use('/pick', limiters.chat, require('./routes/pickerRoutes')); // page opened from the WhatsApp "Pick date and time" button
 app.use('/api', limiters.global, routes);
 app.use('/api', notFound);
