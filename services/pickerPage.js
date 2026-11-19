@@ -134,6 +134,7 @@ const JS = `(function () {
   function key(y, m, d) { return y + '-' + pad(m + 1) + '-' + pad(d); }
   function parseKey(k) { var p = k.split('-'); return { y: +p[0], m: +p[1] - 1, d: +p[2] }; }
   function dow(k) { var p = parseKey(k); return new Date(Date.UTC(p.y, p.m, p.d)).getUTCDay(); }
+  function fullDate(k) { var p = parseKey(k); return DAYS[dow(k)] + ', ' + p.d + ' ' + MONTHS[p.m] + ' ' + p.y; }
   function longDate(k) { var p = parseKey(k); return DAYS[dow(k)].slice(0, 3) + ' ' + p.d + ' ' + MONTHS[p.m].slice(0, 3) + ' ' + p.y; }
 
   function clock() {
@@ -244,7 +245,7 @@ const JS = `(function () {
     show(''); refreshTime();
   }
   function summary() {
-    $('selDate').textContent = sel.date ? longDate(sel.date) : 'Tap a date';
+    $('selDate').textContent = sel.date ? fullDate(sel.date) : 'Tap a date';
     if (sel.date && sel.time) { $('sum').hidden = false; $('sum').textContent = 'You chose: ' + longDate(sel.date) + ', ' + sel.label + ' (' + tzShort + ')'; }
     else $('sum').hidden = true;
     $('save').disabled = !(sel.date && sel.time);
@@ -270,7 +271,7 @@ const JS = `(function () {
   function checkFree(h24, mm) {
     var t = h24 * 60 + mm, lead = info.minLeadMinutes || 0;
     if (t < toMin(info.dayStart) || t > toMin(info.dayEnd)) return { error: 'Please choose a time between ' + clock12(info.dayStart) + ' and ' + clock12(info.dayEnd) + '.' };
-    if (sel.date === info.minDate && t < nowMinutes() + lead) return { error: 'Please choose a time at least ' + lead + ' minutes from now.' };
+    if (sel.date === info.minDate && t < nowMinutes() + lead) return { error: lead ? 'Please choose a time at least ' + lead + ' minutes from now.' : 'That time has already passed. Please choose a later time.' };
     return { time: pad(h24) + ':' + pad(mm) };
   }
   function refreshFree() {
@@ -295,9 +296,11 @@ const JS = `(function () {
     show(''); refreshFree();
   }
   function earliestFree() {
-    var s = toMin(info.dayStart), e = toMin(info.dayEnd), t = s;
-    if (sel.date === info.minDate) t = Math.max(s, Math.ceil((nowMinutes() + (info.minLeadMinutes || 0)) / 5) * 5);
-    if (t > e) t = e;
+    // the time starts at the CURRENT time, rounded up to the next 5 minutes (today: after the notice time, if any)
+    var s = toMin(info.dayStart), e = toMin(info.dayEnd);
+    var t = Math.ceil((nowMinutes() + (sel.date === info.minDate ? (info.minLeadMinutes || 0) : 0)) / 5) * 5;
+    if (t < s) t = s;
+    if (t > e) t = (sel.date === info.minDate) ? e : s;
     var h = Math.floor(t / 60);
     pick = { h: String((h % 12) || 12), m: pad(t % 60), p: h < 12 ? 'AM' : 'PM' };
     show(''); refreshFree();
@@ -324,11 +327,15 @@ const JS = `(function () {
   }
 
   function chooseDate(k) {
-    sel.date = k; show(''); renderCal(); $('early').textContent = (k === info.minDate) ? 'Now' : 'Earliest';
+    sel.date = k; show(''); renderCal();
     if (info.freeTime) {
+      $('early').textContent = 'Now';
       pick = { h: '', m: '', p: '' }; sel.time = null; sel.label = null; refreshFree();
-      if (k === info.minDate) earliestFree(); // today: start with the current time
-    } else loadSlots(k);
+      earliestFree(); // start with the current time, like the Now button
+    } else {
+      $('early').textContent = (k === info.minDate) ? 'Now' : 'Earliest';
+      loadSlots(k);
+    }
   }
 
   $('cal').addEventListener('click', function (ev) {
@@ -382,7 +389,7 @@ const JS = `(function () {
         if (o.r.ok) { stop('Date and time saved', longDate(sel.date) + ', ' + sel.label + ' (' + tzShort + ')'); goBackSoon(); return; }
         if (codeOf(o.j) === 'SLOT_TAKEN' || o.r.status === 422) {
           // someone else was first (or the time is not allowed): show the fresh list so the customer can pick again
-          show(msgOf(o.r, o.j)); if (info.freeTime) $('save').disabled = false; else loadSlots(sel.date); return;
+          show(codeOf(o.j) === 'DATETIME_IN_PAST' && !info.minLeadMinutes ? 'That time has just passed. Please choose a later time.' : msgOf(o.r, o.j)); if (info.freeTime) $('save').disabled = false; else loadSlots(sel.date); return;
         }
         if (o.r.status === 409 || o.r.status === 403) { stop('This link is no longer active', msgOf(o.r, o.j), true); return; }
         show(msgOf(o.r, o.j)); $('save').disabled = false;
