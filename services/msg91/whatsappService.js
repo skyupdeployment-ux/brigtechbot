@@ -68,25 +68,29 @@ async function acceptWithoutFile(conv, user, number, name, type, why, payload) {
 }
 
 /**
- * The welcome after "Hi": the poster picture, then the company text. The menu follows from the bot as usual.
- * A problem with the picture never blocks the text and the menu (the reason is written to the log).
+ * The welcome after "Hi": ONE message - the poster picture with the company text as its caption. The menu follows from
+ * the bot as usual. If the picture cannot be sent, or WhatsApp refuses the caption, the customer still gets the text
+ * (the reason is written to the log).
  */
 async function sendWelcome(number) {
+  let captioned = false;
   if (!env.PUBLIC_BASE_URL) logger.warn('Welcome picture skipped: the bot does not know its public address yet');
   else {
     try {
-      await client.sendImage(number, `${env.PUBLIC_BASE_URL}/assets/welcome.jpg`, 'Brightech Group - The One Point Solutions');
+      ({ captioned } = await client.sendImageWithText(number, `${env.PUBLIC_BASE_URL}/assets/welcome.jpg`, WELCOME_INTRO));
+      await sleep(Math.max(env.MSG91_SEND_GAP_MS || 0, Number(process.env.WELCOME_PICTURE_DELAY_MS || 1500))); // let the picture arrive before the menu
     } catch (e) {
-      logger.warn(`MSG91 picture send failed (${e.message}) - continuing without the picture`);
+      logger.warn(`MSG91 picture send failed (${e.message}) - sending the text without the picture`);
+    }
+  }
+  if (!captioned) {
+    try {
+      await client.sendText(number, WELCOME_INTRO);
+    } catch (e) {
+      logger.warn(`MSG91 welcome text failed: ${e.message}`);
     }
     if (env.MSG91_SEND_GAP_MS) await sleep(env.MSG91_SEND_GAP_MS);
   }
-  try {
-    await client.sendText(number, WELCOME_INTRO);
-  } catch (e) {
-    logger.warn(`MSG91 welcome text failed: ${e.message}`);
-  }
-  if (env.MSG91_SEND_GAP_MS) await sleep(env.MSG91_SEND_GAP_MS);
 }
 
 async function findOrCreateConversation(number) {
