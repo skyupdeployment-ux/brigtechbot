@@ -23,21 +23,24 @@ const tel = () => `tel:+${PHONE}`;
 const whatsapp = (p) => `https://wa.me/${PHONE}?text=${encodeURIComponent(`Hello Brightech Group, I would like to enquire about: ${p || 'your products'}`)}`;
 
 /**
- * The WhatsApp message with the three links. Email and call go through two small pages on this server
- * (WhatsApp does not open mailto: / tel: links by itself); without a known server address the plain
- * email address and phone number are shown instead (WhatsApp makes both tappable).
+ * The messages after a customer picks a product: a short line, then THREE cards, each with its own green button
+ *   Email your Enquiry    [Open Email]
+ *   WhatsApp your Enquiry [Open WhatsApp]
+ *   Call us for support   [Call +91-9620861000]
+ * (a WhatsApp button label can have 20 characters, so the full wording is in the text of each card).
+ * Email and call go through two small pages on this server (WhatsApp does not open mailto: / tel: by itself).
+ * Without a known server address those two cards show the plain email address / phone number instead
+ * (WhatsApp makes both tappable). An item without `url` is a plain text message.
  */
-function enquiryText(product, baseUrl) {
+function enquiryItems(product, baseUrl) {
   const p = clip(product);
-  const emailLink = baseUrl ? `${baseUrl}/go/email?p=${encodeURIComponent(p)}` : EMAIL;
-  const callLink = baseUrl ? `${baseUrl}/go/call` : PHONE_SHOW;
-  return (
-    `✅ You selected *${p}*.\n\nPlease choose how you would like to send your enquiry:\n\n` +
-    `✉️ *Email your Enquiry*\n${emailLink}\n\n` +
-    `💬 *WhatsApp your Enquiry*\n${whatsapp(p)}\n\n` +
-    `📞 *Call us for support*\n${callLink}\n\n` +
-    `📧 ${EMAIL}\n📱 ${PHONE_SHOW}`
-  );
+  const call = `Call ${PHONE_SHOW}`;
+  return [
+    { text: `✅ You selected *${p}*.\n\nPlease choose how you would like to send your enquiry:` },
+    { text: `✉️ *Email your Enquiry*\n${EMAIL}`, label: 'Open Email', url: baseUrl ? `${baseUrl}/go/email?p=${encodeURIComponent(p)}` : null },
+    { text: `💬 *WhatsApp your Enquiry*\n${PHONE_SHOW}`, label: 'Open WhatsApp', url: whatsapp(p) },
+    { text: `📞 *Call us for support*\n${PHONE_SHOW}`, label: call.slice(0, 20), url: baseUrl ? `${baseUrl}/go/call` : null },
+  ];
 }
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -53,4 +56,4 @@ a.b{display:block;margin-top:18px;padding:15px;border-radius:14px;background:#00
 <body><main><div class="card"><h1>${esc(title)}</h1><p>${esc(note)}</p><a class="b" href="${esc(url)}">${esc(button)}</a></div></main></body></html>`;
 }
 
-module.exports = { EMAIL, PHONE, PHONE_SHOW, clip, mailto, tel, whatsapp, enquiryText, openPage };
+module.exports = { EMAIL, PHONE, PHONE_SHOW, clip, mailto, tel, whatsapp, enquiryItems, openPage };
