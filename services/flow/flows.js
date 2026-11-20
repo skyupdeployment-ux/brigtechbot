@@ -10,14 +10,16 @@
  */
 
 const { P } = require('../../utils/text');
+const contact = require('../../utils/contact');
+const appEnv = require('../../config/env');
 const { DateTime } = require('luxon');
 const { formatDateShort, formatDateLong } = require('../../utils/time');
 
 /* ---------------- Fixed messages ---------------- */
 // Sent after "Hi": the poster picture, then this text, then the menu below.
 const WELCOME_INTRO =
-  'Dear Sir – Good Day!\n\nGreetings from Brightech Industrial Automation Private Limited.\n\nWe provide reliable industrial electronics repair and automation solutions.\n\n⚙️ *OUR SERVICES*\n\n🔧 *PCB REPAIR & SERVICE – ANY BRAND*\n\n🏭 *INDUSTRIAL:*\nAC Drives (VFD), Servo Drives, HMI, PLC-CPU, I/O Modules, Genset Controllers, SMPS Units, Servo Motors, Spindles.\n\n🌱 *WIND & SOLAR:*\nIGBT Stacks, Driver Boards, Communication Boards, Adapter Boards, Industrial Cooling Fans, PLC-CPU & I/O Modules, HMI & Power Supply Units.\n\n🏢 *BUILDING:*\nHVAC & Chilling Unit AC Drives (VFD), DDC Controllers, Temperature Controller Units, all PCB Boards, High-Speed Cooling Fans, Exhaust Fans.\n\n🔌 *NEW AUTOMATION PRODUCTS:*\nSiemens, Allen-Bradley, Mitsubishi, Schneider Electric, ABB, Omron, Delta, Fuji Electric, B&R, Rexroth, Lenze, GE Fanuc.\n\n🌐 https://www.brightech-group.com\n🌐 https://www.boss-mart.com\n\nWarm Regards,\nTeam Brightech Industrial Automation Private Limited';
-const WELCOME = 'How can we assist you today?';
+  'Dear Sir – Good Day!\n\nGreetings from BRIGHTECH-GROUP.\n\nOur Business activities are Industrial Automation PCB Products Repair & Service, Supply New & Discontinued/Obsolete Products & Automation Solutions.\n\n⚙️ *OUR ACTIVITIES:*\n\n🔧 *PCB REPAIR & SERVICE – ANY BRANDS*\n\n🏭 *INDUSTRIAL SEGMENT:*\nAC Drives (VFD), Servo Drives, HMI, PLC-CPU, I/O Modules, Genset Controllers, SMPS Units, Servo Motors, Spindles.\n\n🌱 *WIND & SOLAR SEGMENT:*\nIGBT Stacks, Driver Boards, Communication Boards, Adapter Boards, Industrial Cooling Fans, PLC-CPU & I/O Modules, HMI & Power Supply Units.\n\n🏢 *BUILDING SEGMENT:*\nHVAC & Chilling Unit AC Drives (VFD), DDC Controllers, Temperature Controller Units, all PCB Boards, High-Speed Cooling Fans, Exhaust Fans.\n\n🔌 *SUPPLY OF AUTOMATION PRODUCTS – NEW / DISCONTINUED /OBSOLETE*\nSiemens, Allen-Bradley, Mitsubishi, Schneider Electric, ABB, Omron, Delta, Fuji Electric, B&R, Rexroth, Lenze, GE Fanuc.\n\n🌐 https://www.brightech-group.com\n🌐 https://www.boss-mart.com\n\nSupporting by,\nSales Team\nBRIGHTECH GROUP';
+const WELCOME = 'For more information, please click the Options below';
 const INVALID = 'Sorry, that option is not valid. Please select one of the available options.';
 const COMMON =
   'Thank you for contacting Brightech!\n\nYour enquiry details have been collected.\n\nWhat would you like to do next?';
@@ -57,15 +59,51 @@ const PINFO = [
   'Components used in control panels and automation systems, such as relays, contactors, switches and power supplies.',
   'Tell us what you need and our sales team will review it.',
 ];
-const infoMsg = (i) =>
-  '📘 *' +
-  (PRODUCT_CAT[i].d || PRODUCT_CAT[i].t) +
-  '*\n' +
-  PINFO[i] +
-  '\n\nBrands, models, availability and pricing: To be confirmed\n\nNext, we will collect a few details for your enquiry.';
-PRODUCT_CAT.forEach((o, i) => {
-  o.info = infoMsg(i);
-});
+// Short description (used by the keyword shortcuts); the old detailed flow keeps the long text below.
+const infoMsg = (i) => '📘 *' + (PRODUCT_CAT[i].d || PRODUCT_CAT[i].t) + '*\n' + PINFO[i];
+const PRODUCT_CAT_FULL = PRODUCT_CAT.map((o, i) =>
+  Object.assign({}, o, {
+    info:
+      infoMsg(i) + '\n\nBrands, models, availability and pricing: To be confirmed\n\nNext, we will collect a few details for your enquiry.',
+  })
+);
+
+/* ---------------- PCB Repair & Service: segments and the products of each ---------------- */
+const SEGMENTS = P([
+  'Industrial Segment|Drives, HMI, PLC, servo and more',
+  'Wind & Solar Segment|IGBT stacks, driver boards and more',
+  'Building Segment|HVAC, DDC and building PCBs',
+]);
+const SVC_PRODUCTS = {
+  'Industrial Segment': P([
+    'AC Drives (VFD)',
+    'Servo Drives',
+    'HMI',
+    'PLC-CPU',
+    'I/O Modules',
+    'Genset Controllers',
+    'SMPS Units',
+    'Servo Motors',
+    'Spindles',
+  ]),
+  'Wind & Solar Segment': P([
+    'IGBT Stacks',
+    'Driver Boards',
+    'Communication Boards',
+    'Adapter Boards',
+    'Industrial Cooling Fans',
+    'PLC-CPU & I/O Modules',
+    'HMI & Power Supply Units',
+  ]),
+  'Building Segment': P([
+    'HVAC & Chilling Drives|HVAC & Chilling Unit AC Drives (VFD)',
+    'DDC Controllers',
+    'Temperature Controllers|Temperature Controller Units',
+    'All PCB Boards',
+    'High-Speed Cooling Fans',
+    'Exhaust Fans',
+  ]),
+};
 
 const REQ_TYPE = P([
   'New product purchase',
@@ -178,6 +216,12 @@ const M = (key, body, what, x = {}) => Object.assign({ k: 'media', key, body, wh
 const L = (key, head, btn, body, opts, x = {}) => Object.assign({ k: 'list', key, head, btn, body, opts }, x);
 const B = (key, body, opts, x = {}) => Object.assign({ k: 'btns', key, body, opts: P(opts) }, x);
 const CONT = '\n\nTap *Continue* when you have finished.';
+// Last step of the Product Enquiry / PCB Repair flows: the three ways to send the enquiry
+const CONTACT_STEP = (key) =>
+  B('Contact', (e) => contact.enquiryText(e.S.data[key], appEnv.PUBLIC_BASE_URL), ['Main Menu', 'End Conversation'], {
+    nonav: true,
+    route: { 'main menu': 'MAIN', 'end conversation': 'END' },
+  });
 
 const SCHED_TEXT = {
   product: 'When should our sales team contact you?',
@@ -228,6 +272,7 @@ const FL = {
     ],
   },
 
+  // NEW: pick a category, then Email / WhatsApp / Call (no more questions)
   product: {
     name: 'Product Enquiry',
     icon: '🛒',
@@ -235,6 +280,18 @@ const FL = {
     topLevel: true,
     steps: [
       L('Category', 'Product Category', 'Select Category', 'Welcome to Brightech Product Enquiry!\n\nPlease select the product category you are interested in.', PRODUCT_CAT),
+      CONTACT_STEP('Category'),
+    ],
+  },
+
+  // The old detailed product enquiry (name, brand, model, quantity, photo, booking ...). Not in the menu: kept for the tests / future use.
+  product_full: {
+    name: 'Product Enquiry',
+    icon: '🛒',
+    top: 'product',
+    topLevel: true,
+    steps: [
+      L('Category', 'Product Category', 'Select Category', 'Welcome to Brightech Product Enquiry!\n\nPlease select the product category you are interested in.', PRODUCT_CAT_FULL),
       T('Manufacturer / brand', 'Please enter the product manufacturer / brand.'),
       T('Model / part number', 'Please enter the model number / part number.'),
       T('Quantity', 'Please enter the required quantity (numbers only).', { v: 'num' }),
@@ -248,7 +305,21 @@ const FL = {
     done: 'Thank you for contacting Brightech!\n\nYour product enquiry details have been collected.\n\nOur sales team will review your requirement and contact you regarding product availability and pricing.',
   },
 
+  // NEW: pick the segment, then the product, then Email / WhatsApp / Call
   service: {
+    name: 'PCB Repair & Service',
+    icon: '🛠️',
+    top: 'service',
+    topLevel: true,
+    steps: [
+      L('Segment', 'PCB Repair & Service', 'Select Segment', '🔧 *PCB REPAIR & SERVICE – ANY BRANDS*\n\nPlease select your segment.', SEGMENTS),
+      L('Product', 'Select Product', 'Select Product', (e) => '*' + (e.S.data['Segment'] || 'PCB Repair & Service') + '*\n\nPlease select the product.', (e) => SVC_PRODUCTS[e.S.data['Segment']] || []),
+      CONTACT_STEP('Product'),
+    ],
+  },
+
+  // The old detailed PCB repair enquiry. Not in the menu: kept for the tests / future use.
+  service_full: {
     name: 'PCB Repair & Industrial Service',
     icon: '🛠️',
     top: 'service',
@@ -437,7 +508,7 @@ const FL = {
       B('VFD need', 'AC Drive / VFD: how can we help you?', ['Product enquiry', 'Repair / Service'], {
         route: {
           'product enquiry': { go: 'product', idx: 1, preset: { Category: 'AC Drive / VFD' }, intro: 'Welcome to Brightech Product Enquiry!\n\n' + infoMsg(2) },
-          'repair / service': { go: 'service', idx: 1, preset: { 'Equipment type': 'AC Drive / VFD' }, intro: 'Welcome to Brightech Industrial Service!\n\nEquipment selected: AC Drive / VFD' },
+          'repair / service': { go: 'service', idx: 1, preset: { Segment: 'Industrial Segment' }, intro: '🔧 *PCB REPAIR & SERVICE – ANY BRANDS*\n\n*Industrial Segment*' },
         },
       }),
     ],
@@ -452,9 +523,12 @@ const KW = {
   vfd: 'vfd',
   career: 'career',
   contact: 'contact',
+  // hidden shortcuts to the old detailed enquiries (used by the tests)
+  'full product enquiry': 'product_full',
+  'full service enquiry': 'service_full',
 };
 const GREET = ['hi', 'hello', 'good morning', 'good evening', 'hey', 'hii', 'hai'];
 
 const REF_CODES = { product: 'PRD', service: 'SVC', auto: 'AUT', robo: 'ROB', bms: 'BMS', career: 'CAR', contact: 'CNT' };
 
-module.exports = { WELCOME_INTRO, FL, KW, GREET, INVALID, SCHED_TEXT, TIME_SLOTS, REF_CODES, buildDateOptions, infoMsg };
+module.exports = { WELCOME_INTRO, WELCOME, MAINOPTS, FL, KW, GREET, INVALID, SCHED_TEXT, TIME_SLOTS, REF_CODES, buildDateOptions, infoMsg };
