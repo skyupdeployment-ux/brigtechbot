@@ -12,7 +12,7 @@ const { DateTime } = require('luxon');
 const { norm, strip, clean } = require('../../utils/text');
 const { validateBookingDate, DATE_KEY_RE, formatNowLine, formatPicked, slotOfHour, parseTypedDateTime } = require('../../utils/time');
 const slotRules = require('../../utils/slots');
-const { FL, KW, GREET, INVALID, SCHED_TEXT, REF_CODES } = require('./flows');
+const { MAINOPTS, FL, KW, GREET, INVALID, SCHED_TEXT, REF_CODES } = require('./flows');
 
 const toPairs = (obj) => Object.keys(obj).map((k) => ({ k, v: obj[k] }));
 const fromPairs = (arr) => (Array.isArray(arr) ? arr : []).reduce((o, p) => ((o[p.k] = p.v), o), {});
@@ -122,18 +122,8 @@ class BotEngine {
       const nav = !st.nonav && S.flow !== 'main' ? [{ t: '⬅️ Go Back' }, { t: '🏠 Main Menu' }] : [];
       this.bot({ head, text: body, list: { btn: st.btn, title: st.head || st.btn, rows: rows.map(rowView), nav: nav.map(rowView) } });
     } else if (st.k === 'dtpick') {
-      const ex = this.ctx.now().plus({ days: 1 }).toFormat('dd/MM/yyyy');
-      this.bot({
-        text:
-          (prefix || '') +
-          this.schedText() +
-          '\n\n🕒 *Now:* ' + formatNowLine(this.ctx.tz) +
-          (this.ctx.slots
-            ? '\n\nTap the button below to choose a date and an available time.\n\nType *No preference* if you have none.'
-            : '\n\nTap the button below to pick your date and time.' +
-              '\n\nOr type it, for example *' + ex + ' 5:30 PM*. Type *No preference* if you have none.'),
-        picker: true,
-      });
+      // just the current date and time, then the "Pick date and time" button (nothing else)
+      this.bot({ text: (prefix || '') + '🕒 *Now:* ' + formatNowLine(this.ctx.tz), picker: true });
     } else if (st.k === 'btns') {
       const b = st.opts.map((o) => o.t);
       if (!st.nonav && b.length === 2) b.push('Go Back');
@@ -411,6 +401,10 @@ class BotEngine {
     return { label: v.label, desc: v.desc };
   }
 
+  /**
+   * Date + time chosen on the web picker (or typed). dateKey = YYYY-MM-DD, time24 = HH:mm (local time).
+   * Returns { label, ... } on success or { error: { code, message } }.
+   */
   /** Is this date + time acceptable? (no state change). Returns { ok: true } or { error: { code, message } }. */
   checkDateTime(dateKey, time24) {
     const S = this.S;
@@ -523,6 +517,16 @@ class BotEngine {
       }
     }
     if (!st) return this.showMain();
+
+    // A customer often taps an option of an OLD main menu that is still in the chat history. That option belongs
+    // to the main menu, not to the step the bot is at now, so go straight to it instead of answering "not valid".
+    // (An option of the CURRENT list always wins. At a typing step only the exact menu text, as WhatsApp sends it, counts.)
+    const hereOpt = (st.k === 'list' || st.k === 'btns') && S.sub !== 'datepick' ? this.matchOpt(st, t) : null;
+    if (!hereOpt) {
+      const k = strip(t);
+      const menuOpt = MAINOPTS.find((o) => (free ? raw.trim() === o.t : strip(o.t) === k || (o.d && strip(o.d) === k)));
+      if (menuOpt) return this.act(menuOpt.go);
+    }
 
     if (st.k === 'dtpick') return this.typedDateTime(raw, t);
 
