@@ -20,12 +20,12 @@ const HTML = `<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Pick date and time - Brightech Group</title>
+<title>Pick date and time - BRIGHTECH-GROUP || BOSS-MART.COM</title>
 <style>
 :root{--navy:#0d2b45;--wa:#008069;--tint:#e6f0eb;--ink:#17211c;--mute:#5f6b65;--line:#d3dad6;--bg:#f1f3f2;--err:#c0392b}
 *{box-sizing:border-box}
 body{margin:0;font:16px/1.5 "Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--ink)}
-header{display:flex;align-items:center;gap:10px;background:#fff;border-bottom:1px solid #e3e7e5;color:var(--navy);padding:8px 16px;font-weight:700;font-size:18px}
+header{display:flex;align-items:center;gap:10px;background:#fff;border-bottom:1px solid #e3e7e5;color:var(--navy);padding:8px 16px;font-weight:700;font-size:15px;line-height:1.25}
 .logo{width:46px;height:46px;display:block;flex:none}
 main{max-width:460px;margin:0 auto;padding:16px 12px 40px}
 .card{background:#fff;border:1px solid #e3e7e5;border-radius:18px;padding:20px 16px}
@@ -70,7 +70,7 @@ select:focus-visible,button:focus-visible{outline:3px solid #9ed8cc;outline-offs
 </style>
 </head>
 <body>
-<header><img class="logo" src="${LOGO}" width="46" height="46" alt=""><span>Brightech Group</span></header>
+<header><img class="logo" src="${LOGO}" width="46" height="46" alt=""><span>BRIGHTECH-GROUP || BOSS-MART.COM</span></header>
 <main>
   <div class="card" id="form">
     <h1>Pick date and time</h1>
@@ -251,10 +251,8 @@ const JS = `(function () {
     $('save').disabled = !(sel.date && sel.time);
   }
 
-  /* ---------- free-time mode: the customer picks ANY start time (like 9:25); nobody guesses how long the meeting lasts ---------- */
+  /* ---------- free-time mode: the customer picks ANY start time (like 9:25): hours 1-12, minutes 00-59, AM / PM ---------- */
   var FREE_NOTE = 'Choose the time you would like us to start.';
-  function toMin(hhmm) { var p = hhmm.split(':'); return (+p[0]) * 60 + (+p[1]); }
-  function clock12(hhmm) { var t = toMin(hhmm), h = Math.floor(t / 60); return ((h % 12) || 12) + ':' + pad(t % 60) + ' ' + (h < 12 ? 'AM' : 'PM'); }
   function h24Of(h, p) { return (+h % 12) + (p === 'PM' ? 12 : 0); }
   function nowMinutes() {
     var d = new Date(Date.now() + skew);
@@ -262,20 +260,15 @@ const JS = `(function () {
     var g = function (t) { var x = p.filter(function (i) { return i.type === t; })[0]; return x ? +x.value : 0; };
     return g('hour') * 60 + g('minute');
   }
-  function freeHours() {
-    var a = Math.floor(toMin(info.dayStart) / 60), z = Math.floor(toMin(info.dayEnd) / 60), out = [], h, l;
-    for (h = a; h <= z; h++) { l = String((h % 12) || 12); if (out.indexOf(l) < 0) out.push(l); }
-    return out;
-  }
+  function hourList() { var out = [], i; for (i = 1; i <= 12; i++) out.push(String(i)); return out; }
   function minuteList() { var out = [], i; for (i = 0; i < 60; i++) out.push(pad(i)); return out; }
   function checkFree(h24, mm) {
     var t = h24 * 60 + mm, lead = info.minLeadMinutes || 0;
-    if (t < toMin(info.dayStart) || t > toMin(info.dayEnd)) return { error: 'Please choose a time between ' + clock12(info.dayStart) + ' and ' + clock12(info.dayEnd) + '.' };
     if (sel.date === info.minDate && t < nowMinutes() + lead) return { error: lead ? 'Please choose a time at least ' + lead + ' minutes from now.' : 'That time has already passed. Please choose a later time.' };
     return { time: pad(h24) + ':' + pad(mm) };
   }
   function refreshFree() {
-    pick.h = fill('selH', freeHours(), pick.h, 'Hr');
+    pick.h = fill('selH', hourList(), pick.h, 'Hr');
     pick.m = fill('selM', minuteList(), pick.m, 'Min');
     pick.p = fill('selP', ['AM', 'PM'], pick.p, 'AM/PM');
     ['selH', 'selM', 'selP', 'early'].forEach(function (id) { $(id).disabled = false; });
@@ -286,21 +279,13 @@ const JS = `(function () {
   }
   function onFree(which) {
     pick[which] = $(which === 'h' ? 'selH' : which === 'm' ? 'selM' : 'selP').value;
-    if (which === 'h' && pick.h) {
-      var a = Math.floor(toMin(info.dayStart) / 60), z = Math.floor(toMin(info.dayEnd) / 60);
-      var fitting = ['AM', 'PM'].filter(function (p) { var x = h24Of(pick.h, p); return x >= a && x <= z; });
-      if (pick.p && fitting.indexOf(pick.p) < 0) pick.p = '';
-      if (!pick.p && fitting.length === 1) pick.p = fitting[0];
-    }
     if (pick.h && pick.p && !pick.m) pick.m = '00'; // hour + AM/PM chosen: start at :00, the customer can change the minutes
     show(''); refreshFree();
   }
   function earliestFree() {
     // the time starts at the CURRENT time, rounded up to the next 5 minutes (today: after the notice time, if any)
-    var s = toMin(info.dayStart), e = toMin(info.dayEnd);
     var t = Math.ceil((nowMinutes() + (sel.date === info.minDate ? (info.minLeadMinutes || 0) : 0)) / 5) * 5;
-    if (t < s) t = s;
-    if (t > e) t = (sel.date === info.minDate) ? e : s;
+    if (t > 1435) t = 1435;
     var h = Math.floor(t / 60);
     pick = { h: String((h % 12) || 12), m: pad(t % 60), p: h < 12 ? 'AM' : 'PM' };
     show(''); refreshFree();
