@@ -77,7 +77,10 @@ async function sendWelcome(number) {
   if (!env.PUBLIC_BASE_URL) logger.warn('Welcome picture skipped: the bot does not know its public address yet');
   else {
     try {
-      ({ captioned } = await client.sendImageWithText(number, `${env.PUBLIC_BASE_URL}/assets/welcome.jpg`, WELCOME_INTRO));
+      // WELCOME_CAPTION=false (Railway): send the picture alone and the text as a normal message right after it
+      const url = `${env.PUBLIC_BASE_URL}/assets/welcome.jpg`;
+      if (process.env.WELCOME_CAPTION === 'false') await client.sendImage(number, url, '');
+      else ({ captioned } = await client.sendImageWithText(number, url, WELCOME_INTRO));
       await sleep(Math.max(env.MSG91_SEND_GAP_MS || 0, Number(process.env.WELCOME_PICTURE_DELAY_MS || 1500))); // let the picture arrive before the menu
     } catch (e) {
       logger.warn(`MSG91 picture send failed (${e.message}) - sending the text without the picture`);
