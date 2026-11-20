@@ -97,6 +97,7 @@ class BotEngine {
     if (msg.btns) m.btns = msg.btns;
     if (msg.datePicker) m.datePicker = msg.datePicker;
     if (msg.picker) m.picker = true;
+    if (msg.cta) m.cta = msg.cta; // a green button that opens a link
     this.out.push(m);
   }
 
@@ -125,6 +126,8 @@ class BotEngine {
       // just the current date and time, then the "Pick date and time" button (nothing else)
       this.bot({ text: (prefix || '') + '🕒 *Now:* ' + formatNowLine(this.ctx.tz), picker: true });
     } else if (st.k === 'btns') {
+      // cards sent before the buttons (e.g. Email / WhatsApp / Call), each with its own link button
+      if (st.links) st.links(this).forEach((it) => this.bot({ text: it.text, cta: it.url ? { text: it.label, url: it.url } : undefined }));
       const b = st.opts.map((o) => o.t);
       if (!st.nonav && b.length === 2) b.push('Go Back');
       this.bot({ text: typeof st.body === 'function' ? st.body(this) : st.body, btns: b });
