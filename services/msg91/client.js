@@ -5,7 +5,7 @@
  * Endpoint + auth header per MSG91 docs:
  *   POST https://control.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/
  *   header  Authkey: <your authkey>
- *   body    { integrated_number, recipient_number, content_type: 'text' | 'interactive' | 'image', text | interactive | attachment_url }
+ *   body    { integrated_number, recipient_number, content_type: 'text' | 'interactive' | 'image', text | interactive | image }
  * NOTE: MSG91 only allows free-form messages inside the 24h customer-service window (after the customer
  * has messaged you). Business-initiated messages need an approved template.
  */
@@ -60,21 +60,21 @@ async function post(payload) {
 const base = (to) => ({ integrated_number: env.MSG91_INTEGRATED_NUMBER, recipient_number: to });
 
 /**
- * Picture message. MSG91 expects the image link in `attachment_url`
- * (its 400 error was: "attachment_url not found in request"), so every shape below includes it.
- * If MSG91 refuses one (4xx), the next shape is tried and the one that works is remembered.
+ * Picture message. MSG91 passes WhatsApp's own format through, so the first shape below is the expected one;
+ * if MSG91 refuses it (4xx), the next shapes are tried and the one that works is remembered.
  * If none works, the picture is skipped for 10 minutes (the text and the menu still go out) and the reason is logged.
  */
 const IMAGE_SHAPES = [
-  (to, link, caption) => ({ ...base(to), content_type: 'image', attachment_url: link, ...(caption ? { caption } : {}) }),
-  (to, link, caption) => ({ ...base(to), content_type: 'image', attachment_url: link, attachment_type: 'image', ...(caption ? { caption } : {}) }),
-  (to, link, caption) => ({ ...base(to), content_type: 'image', image: { link, caption }, attachment_url: link }),
+  (to, link, caption) => ({ ...base(to), content_type: 'image', image: { link, caption } }),
+  (to, link, caption) => ({ ...base(to), content_type: 'image', image: { url: link, caption } }),
+  (to, link, caption) => ({ ...base(to), content_type: 'image', media: { url: link, caption } }),
+  (to, link, caption) => ({ ...base(to), content_type: 'image', url: link, caption }),
 ];
 let imageShape = 0;
 let imageOffUntil = 0;
 
-async function sendImage(to, link, caption) {
-  if (Date.now() < imageOffUntil) throw new Error('picture sending is paused after repeated MSG91 errors');
+/** One try of every message format, no pause. Returns the MSG91 answer or throws the last error. */
+async function tryShapes(to, link, caption) {
   let last;
   for (let i = imageShape; i < IMAGE_SHAPES.length; i += 1) {
     try {
@@ -88,13 +88,49 @@ async function sendImage(to, link, caption) {
       logger.warn(`MSG91 refused picture format #${i + 1}: ${e.message}`);
     }
   }
-  imageOffUntil = Date.now() + 10 * 60 * 1000;
   throw last;
+}
+
+const pause = () => { imageOffUntil = Date.now() + 10 * 60 * 1000; };
+const paused = () => Date.now() < imageOffUntil;
+
+async function sendImage(to, link, caption) {
+  if (paused()) throw new Error('picture sending is paused after repeated MSG91 errors');
+  try {
+    return await tryShapes(to, link, caption);
+  } catch (e) {
+    if (e.permanent) pause();
+    throw e;
+  }
+}
+
+/**
+ * The welcome: the picture WITH the text as its caption, in ONE message.
+ * If MSG91 / WhatsApp refuses the caption (for example it is too long), the picture is sent alone and the caller
+ * sends the text as a normal message. Returns { captioned: true | false }. Throws only if the picture itself fails.
+ */
+async function sendImageWithText(to, link, text) {
+  if (paused()) throw new Error('picture sending is paused after repeated MSG91 errors');
+  try {
+    await tryShapes(to, link, text);
+    return { captioned: true };
+  } catch (e) {
+    if (!e.permanent) throw e;
+    logger.warn('MSG91 refused the picture with its caption - sending the picture alone');
+  }
+  try {
+    await tryShapes(to, link, '');
+    return { captioned: false };
+  } catch (e) {
+    if (e.permanent) pause();
+    throw e;
+  }
 }
 
 module.exports = {
   _resetImageState: () => { imageShape = 0; imageOffUntil = 0; }, // for tests
   sendImage,
+  sendImageWithText,
   sendText: (to, text) => post({ ...base(to), content_type: 'text', text }),
   sendInteractive: (to, interactive) => post({ ...base(to), content_type: 'interactive', interactive }),
 };
