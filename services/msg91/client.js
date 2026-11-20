@@ -60,15 +60,17 @@ async function post(payload) {
 const base = (to) => ({ integrated_number: env.MSG91_INTEGRATED_NUMBER, recipient_number: to });
 
 /**
- * Picture message. MSG91 passes WhatsApp's own format through, so the first shape below is the expected one;
- * if MSG91 refuses it (4xx), the next shapes are tried and the one that works is remembered.
- * If none works, the picture is skipped for 10 minutes (the text and the menu still go out) and the reason is logged.
+ * Picture message. MSG91 answered our first guesses with 400 {"errors": "attachment_url not found in request"}:
+ * it wants the picture address in a field called `attachment_url`. MSG91 does not say how it names the caption, so the
+ * first format sends the caption under both likely names (caption and text); if MSG91 refuses that, the next formats
+ * try one name at a time, and the one that works is remembered. Without a caption only the picture address is sent.
+ * If nothing works, the picture is skipped for 10 minutes (the text and the menu still go out) and the reason is logged.
  */
+const withCaption = (o, caption, keys) => (caption ? { ...o, ...Object.fromEntries(keys.map((k) => [k, caption])) } : o);
 const IMAGE_SHAPES = [
-  (to, link, caption) => ({ ...base(to), content_type: 'image', image: { link, caption } }),
-  (to, link, caption) => ({ ...base(to), content_type: 'image', image: { url: link, caption } }),
-  (to, link, caption) => ({ ...base(to), content_type: 'image', media: { url: link, caption } }),
-  (to, link, caption) => ({ ...base(to), content_type: 'image', url: link, caption }),
+  (to, link, caption) => withCaption({ ...base(to), content_type: 'image', attachment_url: link }, caption, ['caption', 'text']),
+  (to, link, caption) => withCaption({ ...base(to), content_type: 'image', attachment_url: link }, caption, ['caption']),
+  (to, link, caption) => withCaption({ ...base(to), content_type: 'image', attachment_url: link }, caption, ['text']),
 ];
 let imageShape = 0;
 let imageOffUntil = 0;
