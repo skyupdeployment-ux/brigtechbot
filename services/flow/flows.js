@@ -218,8 +218,9 @@ const B = (key, body, opts, x = {}) => Object.assign({ k: 'btns', key, body, opt
 const CONT = '\n\nTap *Continue* when you have finished.';
 // Last step of the Product Enquiry / PCB Repair flows: the three ways to send the enquiry
 const CONTACT_STEP = (key) =>
-  B('Contact', (e) => contact.enquiryText(e.S.data[key], appEnv.PUBLIC_BASE_URL), ['Main Menu', 'End Conversation'], {
+  B('Contact', 'Is there anything else we can help you with?', ['Main Menu', 'End Conversation'], {
     nonav: true,
+    links: (e) => contact.enquiryItems(e.S.data[key], appEnv.PUBLIC_BASE_URL), // sent first: a line + Email / WhatsApp / Call cards
     route: { 'main menu': 'MAIN', 'end conversation': 'END' },
   });
 
