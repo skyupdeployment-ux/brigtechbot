@@ -10,6 +10,7 @@ const routes = require('./routes');
 const sanitize = require('./middleware/sanitize');
 const limiters = require('./middleware/rateLimiters');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
+const contact = require('./utils/contact');
 
 const app = express();
 
@@ -64,6 +65,16 @@ app.use(sanitize);
 app.get('/assets/welcome.jpg', (_req, res) => {
   res.set('Cache-Control', 'public, max-age=86400');
   res.type('image/jpeg').send(require('./services/welcomeImage').welcomeJpg);
+});
+// "Email your Enquiry" / "Call us for support" links from the WhatsApp bot: WhatsApp cannot open mailto: / tel: by itself,
+// so these two small pages open the email app / the phone dialer.
+app.get('/go/email', limiters.chat, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.type('html').send(contact.openPage('Email your Enquiry', `Opening your email app to write to ${contact.EMAIL}...`, contact.mailto(contact.clip(req.query.p)), 'Open email'));
+});
+app.get('/go/call', limiters.chat, (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.type('html').send(contact.openPage('Call us for support', `Calling ${contact.PHONE_SHOW}...`, contact.tel(), `Call ${contact.PHONE_SHOW}`));
 });
 app.use('/pick', limiters.chat, require('./routes/pickerRoutes')); // page opened from the WhatsApp "Pick date and time" button
 app.use('/api', limiters.global, routes);
