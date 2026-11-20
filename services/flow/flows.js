@@ -343,7 +343,20 @@ const FL = {
     done: 'Thank you! Your service enquiry has been received.\n\nOur service team will review the equipment details and contact you regarding the next steps.',
   },
 
+  // NEW: pick an option, then Email / WhatsApp / Call (no more questions)
   auto: {
+    name: 'Industrial Automation Solutions',
+    icon: '⚙️',
+    top: 'auto',
+    topLevel: true,
+    steps: [
+      L('Solution type', 'Solution Type', 'Select Solution', 'Welcome to Brightech Automation Solutions!\n\nWhat type of solution are you looking for?', AUTO),
+      CONTACT_STEP('Solution type'),
+    ],
+  },
+
+  // The old detailed enquiry for this service. Not in the menu: kept for the tests / future use.
+  auto_full: {
     name: 'Industrial Automation Solutions',
     icon: '⚙️',
     top: 'auto',
@@ -362,7 +375,20 @@ const FL = {
     done: 'Thank you for your interest in Brightech!\n\nYour automation project enquiry has been received.\n\nOur team will contact you for further technical discussion.',
   },
 
+  // NEW: pick an option, then Email / WhatsApp / Call (no more questions)
   robo: {
+    name: 'Robotics, CNC & SPM',
+    icon: '🤖',
+    top: 'robo',
+    topLevel: true,
+    steps: [
+      L('Service', 'Select Service', 'Select Service', 'Please select the service you require.', ROBO),
+      CONTACT_STEP('Service'),
+    ],
+  },
+
+  // The old detailed enquiry for this service. Not in the menu: kept for the tests / future use.
+  robo_full: {
     name: 'Robotics, CNC & SPM',
     icon: '🤖',
     top: 'robo',
@@ -383,7 +409,22 @@ const FL = {
     done: 'Thank you! Your robotics / CNC / SPM enquiry has been received.\n\nOur engineering team will contact you.',
   },
 
+  // NEW: pick an option, then Email / WhatsApp / Call (no more questions)
   bms: {
+    name: 'BMS & Building Solutions',
+    icon: '🏢',
+    top: 'bms',
+    topLevel: true,
+    steps: [
+      L('Requirement', 'Your Requirement', 'Select Requirement', 'Welcome to Brightech Building Solutions!\n\nPlease select your requirement.', BMS1, {
+        more: { label: 'More options', desc: 'Show the remaining requirements', opts: BMS2, body: 'More building solutions. Please select your requirement.' },
+      }),
+      CONTACT_STEP('Requirement'),
+    ],
+  },
+
+  // The old detailed enquiry for this service. Not in the menu: kept for the tests / future use.
+  bms_full: {
     name: 'BMS & Building Solutions',
     icon: '🏢',
     top: 'bms',
@@ -403,7 +444,20 @@ const FL = {
     done: 'Thank you for contacting Brightech!\n\nOur building solutions team will review your requirement and get in touch.',
   },
 
+  // NEW: pick an option, then Email / WhatsApp / Call (no more questions)
   career: {
+    name: 'Career & Recruitment',
+    icon: '💼',
+    top: 'career',
+    topLevel: true,
+    steps: [
+      L('Requirement', 'Career Solutions', 'Select Option', 'Welcome to Brightech Career Solutions!\n\nPlease select your requirement.', CAREER),
+      CONTACT_STEP('Requirement'),
+    ],
+  },
+
+  // The old detailed enquiry for this service. Not in the menu: kept for the tests / future use.
+  career_full: {
     name: 'Career & Recruitment',
     icon: '💼',
     top: 'career',
@@ -527,6 +581,10 @@ const KW = {
   // hidden shortcuts to the old detailed enquiries (used by the tests)
   'full product enquiry': 'product_full',
   'full service enquiry': 'service_full',
+  'full automation enquiry': 'auto_full',
+  'full robotics enquiry': 'robo_full',
+  'full bms enquiry': 'bms_full',
+  'full career enquiry': 'career_full',
 };
 const GREET = ['hi', 'hello', 'good morning', 'good evening', 'hey', 'hii', 'hai'];
 
