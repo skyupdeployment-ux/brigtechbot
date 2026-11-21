@@ -72,6 +72,10 @@ async function acceptWithoutFile(conv, user, number, name, type, why, payload) {
  * the bot as usual. If the picture cannot be sent, or WhatsApp refuses the caption, the customer still gets the text
  * (the reason is written to the log).
  */
+// Pause between two messages. MSG91 / WhatsApp deliver messages one by one and a very short pause lets them overtake each other
+// (they arrived in the wrong order). 1.2 seconds keeps them in order. Set MSG91_SEND_GAP_MS in Railway to change it.
+const gapMs = () => (process.env.MSG91_SEND_GAP_MS === undefined || process.env.MSG91_SEND_GAP_MS === '' ? 1200 : env.MSG91_SEND_GAP_MS);
+
 async function sendWelcome(number) {
   let captioned = false;
   if (!env.PUBLIC_BASE_URL) logger.warn('Welcome picture skipped: the bot does not know its public address yet');
@@ -81,7 +85,7 @@ async function sendWelcome(number) {
       const url = `${env.PUBLIC_BASE_URL}/assets/welcome.jpg`;
       if (process.env.WELCOME_CAPTION === 'false') await client.sendImage(number, url, '');
       else ({ captioned } = await client.sendImageWithText(number, url, WELCOME_INTRO));
-      await sleep(Math.max(env.MSG91_SEND_GAP_MS || 0, Number(process.env.WELCOME_PICTURE_DELAY_MS || 1500))); // let the picture arrive before the menu
+      await sleep(Math.max(gapMs(), Number(process.env.WELCOME_PICTURE_DELAY_MS || 1500))); // let the picture arrive before the menu
     } catch (e) {
       logger.warn(`MSG91 picture send failed (${e.message}) - sending the text without the picture`);
     }
@@ -92,7 +96,7 @@ async function sendWelcome(number) {
     } catch (e) {
       logger.warn(`MSG91 welcome text failed: ${e.message}`);
     }
-    if (env.MSG91_SEND_GAP_MS) await sleep(env.MSG91_SEND_GAP_MS);
+    if (gapMs()) await sleep(gapMs());
   }
 }
 
@@ -135,7 +139,7 @@ async function deliver(number, botMessages) {
         logger.error(`MSG91 send failed for ${number}: ${e.message}`);
         return false; // no point sending the rest if the key/IP/number is wrong
       }
-      if (env.MSG91_SEND_GAP_MS) await sleep(env.MSG91_SEND_GAP_MS);
+      if (gapMs()) await sleep(gapMs());
     }
   }
   return true;
