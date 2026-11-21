@@ -253,11 +253,11 @@ const L = (key, head, btn, body, opts, x = {}) => Object.assign({ k: 'list', key
 const B = (key, body, opts, x = {}) => Object.assign({ k: 'btns', key, body, opts: P(opts) }, x);
 const CONT = '\n\nTap *Continue* when you have finished.';
 // Last step of the Product Enquiry / PCB Repair flows: the three ways to send the enquiry
-const CONTACT_STEP = (key) =>
+const CONTACT_STEP = (key, topic) =>
   B('Contact', 'Is there anything else we can help you with?', ['Main Menu', 'End Conversation'], {
     nonav: true,
     // `key` = the name of one answer, or a function that builds the label from several answers (e.g. "PLC - Siemens")
-    links: (e) => contact.enquiryItems(typeof key === 'function' ? key(e) : e.S.data[key], appEnv.PUBLIC_BASE_URL), // sent first: the three cards
+    links: (e) => contact.enquiryItems(typeof key === 'function' ? key(e) : e.S.data[key], appEnv.PUBLIC_BASE_URL, topic), // sent first: the three cards (topic 'career' = the career@ address)
     route: { 'main menu': 'MAIN', 'end conversation': 'END' },
   });
 
@@ -490,7 +490,7 @@ const FL = {
     topLevel: true,
     steps: [
       L('Requirement', 'Career Solutions', 'Select Option', 'Welcome to Brightech Career Solutions!\n\nPlease select your requirement.', CAREER_MENU),
-      CONTACT_STEP('Requirement'),
+      CONTACT_STEP('Requirement', 'career'),
     ],
   },
 
