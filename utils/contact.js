@@ -23,7 +23,7 @@ const tel = () => `tel:+${PHONE}`;
 const whatsapp = (p) => `https://wa.me/${PHONE}?text=${encodeURIComponent(`Hello Brightech Group, I would like to enquire about: ${p || 'your products'}`)}`;
 
 /**
- * The messages after a customer picks a product: a short line, then THREE cards, each with its own green button
+ * The messages after a customer picks a product: THREE cards (the first one starts with "You selected ..."), each with its own green button
  *   Email your Enquiry    [Open Email]
  *   WhatsApp your Enquiry [Open WhatsApp]
  *   Call us for support   [Call +91-9620861000]
@@ -36,8 +36,8 @@ function enquiryItems(product, baseUrl) {
   const p = clip(product);
   const call = `Call ${PHONE_SHOW}`;
   return [
-    { text: `✅ You selected *${p}*.\n\nPlease choose how you would like to send your enquiry:` },
-    { text: `✉️ *Email your Enquiry*\n${EMAIL}`, label: 'Open Email', url: baseUrl ? `${baseUrl}/go/email?p=${encodeURIComponent(p)}` : null },
+    // the "You selected" line is part of the first card, so it can never arrive after the cards
+    { text: `✅ You selected *${p}*.\n\nPlease choose how you would like to send your enquiry:\n\n✉️ *Email your Enquiry*\n${EMAIL}`, label: 'Open Email', url: baseUrl ? `${baseUrl}/go/email?p=${encodeURIComponent(p)}` : null },
     { text: `💬 *WhatsApp your Enquiry*\n${PHONE_SHOW}`, label: 'Open WhatsApp', url: whatsapp(p) },
     { text: `📞 *Call us for support*\n${PHONE_SHOW}`, label: call.slice(0, 20), url: baseUrl ? `${baseUrl}/go/call` : null },
   ];
