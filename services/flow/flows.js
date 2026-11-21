@@ -162,6 +162,19 @@ const BMS1 = P([
   'Lighting Management',
 ]);
 const BMS2 = P(['CCTV & Security', 'Energy Management', 'Interior Solutions', 'Other Requirements']);
+// BMS & Building Solutions as listed on brightech-group.com (BRIGHTECH BMS INTERIOR SOLUTIONS - Activities & Solutions)
+const BMS_SERVICES = P([
+  'Building Mgmt (BMS)|Building Management Solutions - Sales & Services',
+  'HVAC Solutions|HVAC spares, installation, automation and PCB repair',
+  'Car Parking Ventilation|Car parking ventilation system and automation',
+  'Fire Fighting & Safety|Fire fighting and safety automation',
+  'Light Control Automation|Light management: LED, energy saving and IoT lights',
+  'IIoT Based Automation|IIOT based industrial automation: machines and production lines',
+  'Smart Home Automation|Smart home automation with IoT-based solutions',
+  'Energy Management|Energy management solutions and maintenance',
+  'Partition & Interiors|Aluminium partition and interior design',
+  'Other Requirements',
+]);
 const PROPERTY = P(['Commercial Building', 'Industrial Building', 'Residential Apartment', 'Office', 'Hospital', 'Shopping Mall', 'Other']);
 const CAREER = P(['Looking for a Job', 'Hiring Employees', 'Internship Enquiry', 'Other Recruitment Enquiry|Other recruitment enquiry']);
 const JOBCAT = P(['Engineering', 'Electrical & Electronics', 'Automation', 'Mechanical', 'IT & Software', 'Sales & Marketing', 'Administration', 'Other']);
@@ -424,9 +437,7 @@ const FL = {
     top: 'bms',
     topLevel: true,
     steps: [
-      L('Requirement', 'Your Requirement', 'Select Requirement', 'Welcome to Brightech Building Solutions!\n\nPlease select your requirement.', BMS1, {
-        more: { label: 'More options', desc: 'Show the remaining requirements', opts: BMS2, body: 'More building solutions. Please select your requirement.' },
-      }),
+      L('Requirement', 'Your Requirement', 'Select Requirement', 'Welcome to Brightech BMS & Building Solutions!\n\nPlease select your requirement.', BMS_SERVICES),
       CONTACT_STEP('Requirement'),
     ],
   },
