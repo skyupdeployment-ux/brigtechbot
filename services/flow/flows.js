@@ -177,18 +177,36 @@ const BMS_SERVICES = P([
   'Other Requirements',
 ]);
 const PROPERTY = P(['Commercial Building', 'Industrial Building', 'Residential Apartment', 'Office', 'Hospital', 'Shopping Mall', 'Other']);
-const CAREER = P(['Looking for a Job', 'Hiring Employees', 'Internship Enquiry', 'Other Recruitment Enquiry|Other recruitment enquiry']);
+const CAREER = P(['Looking for a Job', 'Hiring Employees', 'Internship Enquiry', 'Other Recruitment Enquiry|Other recruitment enquiry']); // the old detailed flow
+// Career & Recruitment in the menu: only these two
+const CAREER_MENU = P(['Looking for a Job', 'Hiring Employees']);
 const JOBCAT = P(['Engineering', 'Electrical & Electronics', 'Automation', 'Mechanical', 'IT & Software', 'Sales & Marketing', 'Administration', 'Other']);
-const COINFO = P([
-  'About Brightech',
-  'Automation Services|Industrial Automation Services',
-  'Products & Solutions',
-  'PCB Repair Services',
-  'Robotics & CNC',
-  'BMS Solutions',
-  'Career Solutions',
-  'Website & Contact|Website & Contact Details',
-]);
+// Company Information: the "About Brightech" information from brightech-group.com, shown straight away
+const ABOUT_TEXT = `🏢 *About BRIGHTECH-GROUP*
+_Engineering Excellence Since 2012_
+
+BRIGHTECH GROUP is an Industrial Automation Solutions, Building Management Solutions & Manpower Solution providing company since 2012.
+
+*Our group*
+• Brightech Industrial Automation Private Limited – HO Bangalore
+• Brightech BMS Interior Solutions – HO Bangalore, branch Chennai
+• Brightech Engineering – Chennai, Coimbatore, Dindigul, Tirunelveli
+
+*What we do*
+• Industrial automation products – sales, distributor, importer & stockist
+• PCB board-level & chip-level repair & service
+• Robotic based automation projects
+• SPM and CNC machine retrofitting & reconditioning
+• Turn-key & customized industrial automation projects
+• BMS & building solutions – HVAC, car parking ventilation, fire safety, lighting, smart home, energy management
+• Automation products training (Training Division / R&D Lab)
+
+📍 Karnataka, Tamilnadu, Kerala, Andhra Pradesh, Telangana
+📞 ${contact.PHONE_SHOW}
+✉️ ${contact.EMAIL}
+
+🌐 https://www.brightech-group.com
+🌐 https://www.boss-mart.com`;
 const DEPTS = P([
   'Sales Department',
   'Service Department',
@@ -471,7 +489,7 @@ const FL = {
     top: 'career',
     topLevel: true,
     steps: [
-      L('Requirement', 'Career Solutions', 'Select Option', 'Welcome to Brightech Career Solutions!\n\nPlease select your requirement.', CAREER),
+      L('Requirement', 'Career Solutions', 'Select Option', 'Welcome to Brightech Career Solutions!\n\nPlease select your requirement.', CAREER_MENU),
       CONTACT_STEP('Requirement'),
     ],
   },
@@ -560,16 +578,17 @@ const FL = {
     ],
   },
 
+  // Company Information: the About Brightech information (no list of old options, no "to be confirmed")
   coinfo: {
     name: 'Company Information',
     icon: 'ℹ️',
     top: 'coinfo',
     topLevel: true,
     steps: [
-      L('Topic', 'Company Information', 'Select Topic', 'What information would you like to know about Brightech?', COINFO, { info: true }),
-      B('Next step', 'Would you like to make an enquiry?', ['Yes, make an enquiry', 'Talk to our team', 'Main menu'], {
+      B('About', 'Is there anything else we can help you with?', ['Main Menu', 'End Conversation'], {
         nonav: true,
-        route: { 'yes, make an enquiry': 'MAIN', 'talk to our team': 'contact', 'main menu': 'MAIN' },
+        links: () => [{ text: ABOUT_TEXT }], // sent first: the information
+        route: { 'main menu': 'MAIN', 'end conversation': 'END' },
       }),
     ],
   },
@@ -625,4 +644,4 @@ const GREET = ['hi', 'hello', 'good morning', 'good evening', 'hey', 'hii', 'hai
 
 const REF_CODES = { product: 'PRD', service: 'SVC', auto: 'AUT', robo: 'ROB', bms: 'BMS', career: 'CAR', contact: 'CNT' };
 
-module.exports = { WELCOME_INTRO, WELCOME, MAINOPTS, FL, KW, GREET, INVALID, SCHED_TEXT, TIME_SLOTS, REF_CODES, buildDateOptions, infoMsg };
+module.exports = { WELCOME_INTRO, WELCOME, ABOUT_TEXT, MAINOPTS, FL, KW, GREET, INVALID, SCHED_TEXT, TIME_SLOTS, REF_CODES, buildDateOptions, infoMsg };
