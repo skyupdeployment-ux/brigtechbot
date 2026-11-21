@@ -68,6 +68,10 @@ const PRODUCT_CAT_FULL = PRODUCT_CAT.map((o, i) =>
   })
 );
 
+/* ---------------- Product Enquiry: the brands (WhatsApp shows 10 rows, so the last ones are on a second page) ---------------- */
+const BRANDS = P(['Siemens', 'Allen-Bradley', 'Mitsubishi', 'Schneider Electric', 'ABB', 'Omron', 'Delta', 'Fuji Electric', 'B&R']);
+const BRANDS2 = P(['Rexroth', 'Lenze', 'GE Fanuc', 'Other Brand']);
+
 /* ---------------- PCB Repair & Service: segments and the products of each ---------------- */
 const SEGMENTS = P([
   'Industrial Segment|Drives, HMI, PLC, servo and more',
@@ -220,7 +224,8 @@ const CONT = '\n\nTap *Continue* when you have finished.';
 const CONTACT_STEP = (key) =>
   B('Contact', 'Is there anything else we can help you with?', ['Main Menu', 'End Conversation'], {
     nonav: true,
-    links: (e) => contact.enquiryItems(e.S.data[key], appEnv.PUBLIC_BASE_URL), // sent first: a line + Email / WhatsApp / Call cards
+    // `key` = the name of one answer, or a function that builds the label from several answers (e.g. "PLC - Siemens")
+    links: (e) => contact.enquiryItems(typeof key === 'function' ? key(e) : e.S.data[key], appEnv.PUBLIC_BASE_URL), // sent first: the three cards
     route: { 'main menu': 'MAIN', 'end conversation': 'END' },
   });
 
@@ -281,7 +286,10 @@ const FL = {
     topLevel: true,
     steps: [
       L('Category', 'Product Category', 'Select Category', 'Welcome to Brightech Product Enquiry!\n\nPlease select the product category you are interested in.', PRODUCT_CAT),
-      CONTACT_STEP('Category'),
+      L('Brand', 'Select Brand', 'Select Brand', (e) => '*' + (e.S.data['Category'] || 'Product Enquiry') + '*\n\nPlease select the brand.', BRANDS, {
+        more: { label: 'More brands', desc: 'Rexroth, Lenze, GE Fanuc and more', opts: BRANDS2, body: 'More brands. Please select the brand.' },
+      }),
+      CONTACT_STEP((e) => e.S.data['Category'] + ' - ' + e.S.data['Brand']),
     ],
   },
 
