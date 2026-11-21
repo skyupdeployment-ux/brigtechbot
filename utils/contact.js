@@ -5,10 +5,15 @@
  *   Email your Enquiry    -> opens the customer's email app, addressed to sales@brightech-group.com
  *   WhatsApp your Enquiry -> opens a WhatsApp chat with +91-9620861000 with the message already typed
  *   Call us for support   -> opens the phone dialer with +91-9620861000
- * To change the numbers later, set ENQUIRY_EMAIL / ENQUIRY_PHONE in Railway (or edit the two lines below).
+ * Career & Recruitment writes to its own address (career@brightech-group.com).
+ * To change them later, set ENQUIRY_EMAIL / CAREER_EMAIL / ENQUIRY_PHONE in Railway (or edit the lines below).
  */
 
 const EMAIL = process.env.ENQUIRY_EMAIL || 'sales@brightech-group.com';
+const CAREER_EMAIL = process.env.CAREER_EMAIL || 'career@brightech-group.com';
+// the topics a link may ask for (never an address typed in a link: the page only knows these)
+const EMAILS = { sales: EMAIL, career: CAREER_EMAIL };
+const emailFor = (topic) => EMAILS[String(topic || '')] || EMAIL;
 const PHONE = (process.env.ENQUIRY_PHONE || '919620861000').replace(/\D/g, ''); // digits with country code
 const PHONE_SHOW = PHONE.length === 12 && PHONE.startsWith('91') ? `+91-${PHONE.slice(2)}` : `+${PHONE}`;
 
@@ -18,7 +23,7 @@ const clip = (s) => String(s || '').replace(/[\u0000-\u001f]/g, ' ').replace(/\s
 const subject = (p) => `Enquiry${p ? ' - ' + p : ''}`;
 const emailBody = (p) => `Hello Brightech Group,\n\nI would like to enquire about: ${p || 'your products'}\n\nName:\nCompany:\nCity:\nPhone:\nModel / quantity / requirement:\n`;
 
-const mailto = (p) => `mailto:${EMAIL}?subject=${encodeURIComponent(subject(p))}&body=${encodeURIComponent(emailBody(p))}`;
+const mailto = (p, topic) => `mailto:${emailFor(topic)}?subject=${encodeURIComponent(subject(p))}&body=${encodeURIComponent(emailBody(p))}`;
 const tel = () => `tel:+${PHONE}`;
 const whatsapp = (p) => `https://wa.me/${PHONE}?text=${encodeURIComponent(`Hello Brightech Group, I would like to enquire about: ${p || 'your products'}`)}`;
 
@@ -32,12 +37,14 @@ const whatsapp = (p) => `https://wa.me/${PHONE}?text=${encodeURIComponent(`Hello
  * Without a known server address those two cards show the plain email address / phone number instead
  * (WhatsApp makes both tappable). An item without `url` is a plain text message.
  */
-function enquiryItems(product, baseUrl) {
+function enquiryItems(product, baseUrl, topic) {
   const p = clip(product);
+  const to = emailFor(topic);
+  const topicQuery = EMAILS[String(topic || '')] && topic !== 'sales' ? `&t=${encodeURIComponent(topic)}` : '';
   const call = `Call ${PHONE_SHOW}`;
   return [
     // the "You selected" line is part of the first card, so it can never arrive after the cards
-    { text: `✅ You selected *${p}*.\n\nPlease choose how you would like to send your enquiry:\n\n✉️ *Email your Enquiry*\n${EMAIL}`, label: 'Open Email', url: baseUrl ? `${baseUrl}/go/email?p=${encodeURIComponent(p)}` : null },
+    { text: `✅ You selected *${p}*.\n\nPlease choose how you would like to send your enquiry:\n\n✉️ *Email your Enquiry*\n${to}`, label: 'Open Email', url: baseUrl ? `${baseUrl}/go/email?p=${encodeURIComponent(p)}${topicQuery}` : null },
     { text: `💬 *WhatsApp your Enquiry*\n${PHONE_SHOW}`, label: 'Open WhatsApp', url: whatsapp(p) },
     { text: `📞 *Call us for support*\n${PHONE_SHOW}`, label: call.slice(0, 20), url: baseUrl ? `${baseUrl}/go/call` : null },
   ];
@@ -56,4 +63,4 @@ a.b{display:block;margin-top:18px;padding:15px;border-radius:14px;background:#00
 <body><main><div class="card"><h1>${esc(title)}</h1><p>${esc(note)}</p><a class="b" href="${esc(url)}">${esc(button)}</a></div></main></body></html>`;
 }
 
-module.exports = { EMAIL, PHONE, PHONE_SHOW, clip, mailto, tel, whatsapp, enquiryItems, openPage };
+module.exports = { EMAIL, CAREER_EMAIL, emailFor, PHONE, PHONE_SHOW, clip, mailto, tel, whatsapp, enquiryItems, openPage };
