@@ -34,8 +34,9 @@ const MAINOPTS = P([
   '6️⃣ Career & Recruitment|Jobs, hiring and internships',
   '7️⃣ Company Information|Learn about Brightech',
   '8️⃣ Contact Our Team|Reach the right department',
+  '9️⃣ Automation Training|Automation Products Training',
 ]);
-['product', 'service', 'auto', 'robo', 'bms', 'career', 'coinfo', 'contact'].forEach((g, i) => {
+['product', 'service', 'auto', 'robo', 'bms', 'career', 'coinfo', 'contact', 'training'].forEach((g, i) => {
   MAINOPTS[i].go = g;
 });
 
@@ -545,6 +546,20 @@ const FL = {
     done: 'Thank you! Our recruitment team will contact you regarding your enquiry.',
   },
 
+  // NEW: Automation Products Training (the Training Division: industrial automation brand specialization training)
+  training: {
+    name: 'Automation Products Training',
+    icon: '🎓',
+    top: 'training',
+    topLevel: true,
+    steps: [
+      L('Brand', 'Automation Training', 'Select Brand', 'Welcome to Brightech Automation Products Training!\n\nIndustrial automation brand specialization training.\n\nPlease select the brand you want training on.', BRANDS, {
+        more: { label: 'More brands', desc: 'Rexroth, Lenze, GE Fanuc and more', opts: BRANDS2, body: 'More brands. Please select the brand you want training on.' },
+      }),
+      CONTACT_STEP((e) => e.S.data['Brand'] + ' Training'),
+    ],
+  },
+
   coinfo: {
     name: 'Company Information',
     icon: 'ℹ️',
@@ -596,6 +611,7 @@ const KW = {
   plc: { go: 'product', idx: 1, preset: { Category: 'PLC' }, intro: 'Welcome to Brightech Product Enquiry!\n\n' + infoMsg(0) },
   vfd: 'vfd',
   career: 'career',
+  training: 'training',
   contact: 'contact',
   // hidden shortcuts to the old detailed enquiries (used by the tests)
   'full product enquiry': 'product_full',
