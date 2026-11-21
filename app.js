@@ -70,7 +70,7 @@ app.get('/assets/welcome.jpg', (_req, res) => {
 // so these two small pages open the email app / the phone dialer.
 app.get('/go/email', limiters.chat, (req, res) => {
   res.set('Cache-Control', 'no-store');
-  res.type('html').send(contact.openPage('Email your Enquiry', `Opening your email app to write to ${contact.EMAIL}...`, contact.mailto(contact.clip(req.query.p)), 'Open email'));
+  res.type('html').send(contact.openPage('Email your Enquiry', `Opening your email app to write to ${contact.emailFor(req.query.t)}...`, contact.mailto(contact.clip(req.query.p), req.query.t), 'Open email'));
 });
 app.get('/go/call', limiters.chat, (_req, res) => {
   res.set('Cache-Control', 'no-store');
