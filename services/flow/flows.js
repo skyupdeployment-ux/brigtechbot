@@ -30,12 +30,13 @@ const MAINOPTS = P([
   '3️⃣ Automation Solutions|Industrial Automation Solutions',
   '4️⃣ Robotics, CNC & SPM|Industrial robotics, CNC and special machines',
   '5️⃣ BMS & Building|BMS & Building Solutions',
-  '6️⃣ Career & Recruitment|Jobs, hiring and internships',
-  '7️⃣ Company Information|Learn about Brightech',
-  '8️⃣ Contact Our Team|Reach the right department',
-  '9️⃣ Automation Training|Automation Products Training',
+  '6️⃣ Training Division|TRAINING DIVISION & R&D DIVISION',
+  '7️⃣ PCB Reverse & Design|PCB REVERSE ENGINEERING & PCB NEW DESIGN',
+  '8️⃣ Recruitment & Hiring|Jobs and hiring',
+  '9️⃣ Company Information|Learn about Brightech',
+  '🔟 Contact Us|Branch addresses and contact',
 ]);
-['product', 'service', 'auto', 'robo', 'bms', 'career', 'coinfo', 'contact', 'training'].forEach((g, i) => {
+['product', 'service', 'auto', 'robo', 'bms', 'trainingdiv', 'pcbdesign', 'career', 'coinfo', 'contactus'].forEach((g, i) => {
   MAINOPTS[i].go = g;
 });
 
@@ -68,9 +69,39 @@ const PRODUCT_CAT_FULL = PRODUCT_CAT.map((o, i) =>
   })
 );
 
-/* ---------------- Product Enquiry: the brands (WhatsApp shows 10 rows, so the last ones are on a second page) ---------------- */
-const BRANDS = P(['Siemens', 'Allen-Bradley', 'Mitsubishi', 'Schneider Electric', 'ABB', 'Omron', 'Delta', 'Fuji Electric', 'B&R']);
-const BRANDS2 = P(['Rexroth', 'Lenze', 'GE Fanuc', 'Other Brand']);
+/* ---------------- Contact Us: one address message per branch (from brightech-group.com/contact_us) ---------------- */
+const BRANCH_ROWS = P(['Bangalore|Head Office & Factory', 'Chennai|Corporate Office & Factory', 'Coimbatore|Service Centre & Factory', 'Dindigul|Service Center & Office', 'Malaysia']);
+const BRANCH_TEXT = {
+  Bangalore: `📍 *Bangalore* – Head Office & Factory
+Brightech Industrial Automation Pvt. Ltd.
+No.7, 1st Floor, Basappa Reddy Compound, Y.V.Annaiah Road, Yelachanalli, Bangalore-560076, Karnataka.
+📞 080-49714840
+Sales Team: 9900002204, 9606537200, 9591879015, 9606326001
+
+*Brightech Career Solutions* – Head Office
+No.7A, 1st Floor, Basappa Reddy Compound, Y.V.Annaiah Road, Yelachanahalli, Bangalore-560076, Karnataka.
+HR Team: 9035028272, 9035028270
+
+*Brightech BMS Interior Solutions* – Head Office
+No.7B, 1st Floor, Basappa Reddy Compound, Y.V.Annaiah Road, Yelachanahalli, Bangalore-560076, Karnataka.
+Sales Team: 9606815911, 9900002204`,
+  Chennai: `📍 *Chennai* – Corporate Office & Factory
+Brightech Industrial Automation Pvt. Ltd.
+No.14/76, SHRIWIN, Ground Floor, 3rd Main Rd, Ayyavoo Nagar, Maduravoyal, Chennai, Tamil Nadu 600095.
+Sales Team: 9606328004, 9606328002, 9606821911`,
+  Coimbatore: `📍 *Coimbatore* – Service Centre & Factory
+BRIGHTECH ENGINEERING
+No.31, Andal Nagar East, Uppilipalayam Post, Ramanujar Nagar, Coimbatore-641015, Tamil Nadu.
+Sales Team: 9606328004, 9035028270, 9606328002`,
+  Dindigul: `📍 *Dindigul* – Service Center & Office
+BRIGHTECH ENGINEERING
+No. 11-7-23-E3, Anna Nagar Main Street, Mettupatti, Chinnalapatti, Dindigul, Tamil Nadu - 624 301.
+Sales Team: 9606526100, 9845359300`,
+  // TODO: put the real Malaysia address here (it is not on the website's Contact Us page)
+  Malaysia: `📍 *Malaysia*
+The Malaysia branch address will be shared shortly.
+For now please contact us on ${contact.PHONE_SHOW} or ${contact.EMAIL}.`,
+};
 
 /* ---------------- PCB Repair & Service: segments and the products of each ---------------- */
 const SEGMENTS = P([
@@ -256,7 +287,7 @@ const CONTACT_STEP = (key, topic) =>
   B('Contact', 'Is there anything else we can help you with?', ['Main Menu', 'End Conversation'], {
     nonav: true,
     // `key` = the name of one answer, or a function that builds the label from several answers (e.g. "PLC - Siemens")
-    links: (e) => contact.enquiryItems(typeof key === 'function' ? key(e) : e.S.data[key], appEnv.PUBLIC_BASE_URL, topic), // sent first: the three cards (topic 'career' = the career@ address)
+    links: (e) => contact.enquiryItems(typeof key === 'function' ? key(e) : e.S.data[key], appEnv.PUBLIC_BASE_URL, typeof topic === 'function' ? topic(e) : topic), // sent first: the three cards (topic = which email address: sales / careers / hr)
     route: { 'main menu': 'MAIN', 'end conversation': 'END' },
   });
 
@@ -309,18 +340,16 @@ const FL = {
     ],
   },
 
-  // NEW: pick a category, then Email / WhatsApp / Call (no more questions)
+  // NEW: Select Segment -> Select Product (the same lists as PCB Repair & Service) -> Email / WhatsApp / Call
   product: {
     name: 'Product Enquiry',
     icon: '🛒',
     top: 'product',
     topLevel: true,
     steps: [
-      L('Category', 'Product Category', 'Select Category', 'Welcome to Brightech Product Enquiry!\n\nPlease select the product category you are interested in.', PRODUCT_CAT),
-      L('Brand', 'Select Brand', 'Select Brand', (e) => '*' + (e.S.data['Category'] || 'Product Enquiry') + '*\n\nPlease select the brand.', BRANDS, {
-        more: { label: 'More brands', desc: 'Rexroth, Lenze, GE Fanuc and more', opts: BRANDS2, body: 'More brands. Please select the brand.' },
-      }),
-      CONTACT_STEP((e) => e.S.data['Category'] + ' - ' + e.S.data['Brand']),
+      L('Segment', 'Product Enquiry', 'Select Segment', 'Welcome to Brightech Product Enquiry!\n\nPlease select your segment.', SEGMENTS),
+      L('Product', 'Select Product', 'Select Product', (e) => '*' + (e.S.data['Segment'] || 'Product Enquiry') + '*\n\nPlease select the product.', (e) => SVC_PRODUCTS[e.S.data['Segment']] || []),
+      CONTACT_STEP('Product'),
     ],
   },
 
@@ -483,13 +512,14 @@ const FL = {
 
   // NEW: pick an option, then Email / WhatsApp / Call (no more questions)
   career: {
-    name: 'Career & Recruitment',
+    name: 'Recruitment & Hiring',
     icon: '💼',
     top: 'career',
     topLevel: true,
     steps: [
-      L('Requirement', 'Career Solutions', 'Select Option', 'Welcome to Brightech Career Solutions!\n\nPlease select your requirement.', CAREER_MENU),
-      CONTACT_STEP('Requirement', 'career'),
+      L('Requirement', 'Recruitment & Hiring', 'Select Option', 'Welcome to Brightech Recruitment & Hiring!\n\nPlease select your requirement.', CAREER_MENU),
+      // Looking for a Job -> careers@, Hiring Employees -> hr@
+      CONTACT_STEP('Requirement', (e) => (e.S.data['Requirement'] === 'Hiring Employees' ? 'hr' : 'careers')),
     ],
   },
 
@@ -563,17 +593,38 @@ const FL = {
     done: 'Thank you! Our recruitment team will contact you regarding your enquiry.',
   },
 
-  // NEW: Automation Products Training (the Training Division: industrial automation brand specialization training)
-  training: {
-    name: 'Automation Products Training',
+  // NEW: menu title only -> Email / WhatsApp / Call
+  trainingdiv: {
+    name: 'Training Division & R&D Division',
     icon: '🎓',
-    top: 'training',
+    top: 'trainingdiv',
+    topLevel: true,
+    steps: [CONTACT_STEP(() => 'TRAINING DIVISION & R&D DIVISION')],
+  },
+
+  // NEW: menu title only -> Email / WhatsApp / Call
+  pcbdesign: {
+    name: 'PCB Reverse Engineering & PCB New Design',
+    icon: '🧩',
+    top: 'pcbdesign',
+    topLevel: true,
+    steps: [CONTACT_STEP(() => 'PCB REVERSE ENGINEERING & PCB NEW DESIGN')],
+  },
+
+  // NEW: Contact Us: pick a branch -> its address -> then Email / WhatsApp / Call (below the address)
+  contactus: {
+    name: 'Contact Us',
+    icon: '📍',
+    top: 'contactus',
     topLevel: true,
     steps: [
-      L('Brand', 'Automation Training', 'Select Brand', 'Welcome to Brightech Automation Products Training!\n\nIndustrial automation brand specialization training.\n\nPlease select the brand you want training on.', BRANDS, {
-        more: { label: 'More brands', desc: 'Rexroth, Lenze, GE Fanuc and more', opts: BRANDS2, body: 'More brands. Please select the brand you want training on.' },
+      L('Branch', 'Contact Us', 'Select Branch', 'Brightech Group - Contact Us\n\nPlease select the branch to see its address.', BRANCH_ROWS),
+      B('Contact', 'Is there anything else we can help you with?', ['Main Menu', 'End Conversation'], {
+        nonav: true,
+        // sent first: the branch address, then the same Email / WhatsApp / Call cards as everywhere else
+        links: (e) => [{ text: BRANCH_TEXT[e.S.data['Branch']] || BRANCH_TEXT.Bangalore }].concat(contact.enquiryItems(e.S.data['Branch'] + ' Branch', appEnv.PUBLIC_BASE_URL)),
+        route: { 'main menu': 'MAIN', 'end conversation': 'END' },
       }),
-      CONTACT_STEP((e) => e.S.data['Brand'] + ' Training'),
     ],
   },
 
@@ -614,7 +665,7 @@ const FL = {
     steps: [
       B('VFD need', 'AC Drive / VFD: how can we help you?', ['Product enquiry', 'Repair / Service'], {
         route: {
-          'product enquiry': { go: 'product', idx: 1, preset: { Category: 'AC Drive / VFD' }, intro: 'Welcome to Brightech Product Enquiry!\n\n' + infoMsg(2) },
+          'product enquiry': { go: 'product', idx: 2, preset: { Segment: 'Industrial Segment', Product: 'AC Drives (VFD)' }, intro: 'Welcome to Brightech Product Enquiry!\n\n' + infoMsg(2) },
           'repair / service': { go: 'service', idx: 1, preset: { Segment: 'Industrial Segment' }, intro: '🔧 *PCB REPAIR & SERVICE – ANY BRANDS*\n\n*Industrial Segment*' },
         },
       }),
@@ -626,11 +677,12 @@ const FL = {
 const KW = {
   product: 'product',
   repair: 'service',
-  plc: { go: 'product', idx: 1, preset: { Category: 'PLC' }, intro: 'Welcome to Brightech Product Enquiry!\n\n' + infoMsg(0) },
+  plc: { go: 'product', idx: 2, preset: { Segment: 'Industrial Segment', Product: 'PLC-CPU' }, intro: 'Welcome to Brightech Product Enquiry!\n\n' + infoMsg(0) },
   vfd: 'vfd',
   career: 'career',
-  training: 'training',
-  contact: 'contact',
+  training: 'trainingdiv',
+  'reverse engineering': 'pcbdesign',
+  contact: 'contactus',
   // hidden shortcuts to the old detailed enquiries (used by the tests)
   'full product enquiry': 'product_full',
   'full service enquiry': 'service_full',
@@ -638,6 +690,7 @@ const KW = {
   'full robotics enquiry': 'robo_full',
   'full bms enquiry': 'bms_full',
   'full career enquiry': 'career_full',
+  'full contact enquiry': 'contact', // the old Contact Our Team (departments) page
 };
 const GREET = ['hi', 'hello', 'good morning', 'good evening', 'hey', 'hii', 'hai'];
 
@@ -650,12 +703,11 @@ const REF_CODES = { product: 'PRD', service: 'SVC', auto: 'AUT', robo: 'ROB', bm
  */
 const GLOBAL_OPTS = [];
 [
-  ['product', 1, 'Category', PRODUCT_CAT],
-  ['service', 1, 'Segment', SEGMENTS],
   ['auto', 1, 'Solution type', AUTO],
   ['robo', 1, 'Service', ROBO],
   ['bms', 1, 'Requirement', BMS_SERVICES],
   ['career', 1, 'Requirement', CAREER_MENU],
+  ['contactus', 1, 'Branch', BRANCH_ROWS],
 ].forEach(([go, idx, key, rows]) => rows.forEach((r) => GLOBAL_OPTS.push({ t: r.t, go, idx, preset: { [key]: r.t } })));
 const optKey = (t) => strip(t);
 for (let i = GLOBAL_OPTS.length - 1; i >= 0; i -= 1) {
