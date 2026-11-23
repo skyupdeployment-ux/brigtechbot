@@ -12,7 +12,7 @@ const { DateTime } = require('luxon');
 const { norm, strip, clean } = require('../../utils/text');
 const { validateBookingDate, DATE_KEY_RE, formatNowLine, formatPicked, slotOfHour, parseTypedDateTime } = require('../../utils/time');
 const slotRules = require('../../utils/slots');
-const { MAINOPTS, FL, KW, GREET, INVALID, SCHED_TEXT, REF_CODES } = require('./flows');
+const { MAINOPTS, FL, KW, GREET, GLOBAL_OPTS, SCHED_TEXT, REF_CODES } = require('./flows');
 
 const toPairs = (obj) => Object.keys(obj).map((k) => ({ k, v: obj[k] }));
 const fromPairs = (arr) => (Array.isArray(arr) ? arr : []).reduce((o, p) => ((o[p.k] = p.v), o), {});
@@ -102,7 +102,7 @@ class BotEngine {
   }
 
   /* ---------------- Rendering a step ---------------- */
-  sendStep(prefix) {
+  sendStep(prefix, opts) {
     const S = this.S;
     const f = FL[S.flow];
     const st = f.steps[S.idx];
@@ -127,7 +127,7 @@ class BotEngine {
       this.bot({ text: (prefix || '') + '🕒 *Now:* ' + formatNowLine(this.ctx.tz), picker: true });
     } else if (st.k === 'btns') {
       // cards sent before the buttons (e.g. Email / WhatsApp / Call), each with its own link button
-      if (st.links) st.links(this).forEach((it) => this.bot({ text: it.text, cta: it.url ? { text: it.label, url: it.url } : undefined }));
+      if (st.links && !(opts && opts.skipCards)) st.links(this).forEach((it) => this.bot({ text: it.text, cta: it.url ? { text: it.label, url: it.url } : undefined }));
       const b = st.opts.map((o) => o.t);
       if (!st.nonav && b.length === 2) b.push('Go Back');
       this.bot({ text: typeof st.body === 'function' ? st.body(this) : st.body, btns: b });
@@ -156,6 +156,14 @@ class BotEngine {
       },
       btns: ['Go Back', 'Main Menu'],
     });
+  }
+
+  /**
+   * Something that is not an option of the current step (for example a tap on an old list): no complaint, the current
+   * step is simply shown again. A step that has cards (Email / WhatsApp / Call) shows only its buttons, not the cards again.
+   */
+  resend() {
+    this.sendStep(undefined, { skipCards: true });
   }
 
   err(msg) {
@@ -529,6 +537,10 @@ class BotEngine {
       const k = strip(t);
       const menuOpt = MAINOPTS.find((o) => (free ? raw.trim() === o.t : strip(o.t) === k || (o.d && strip(o.d) === k)));
       if (menuOpt) return this.act(menuOpt.go);
+      // an option of an old list of Product Enquiry / PCB Repair / Automation / Robotics / BMS / Career: open that option
+      // (never at a typing step: a typed answer is never taken for a menu option)
+      const globalOpt = free ? null : GLOBAL_OPTS.find((o) => strip(o.t) === k);
+      if (globalOpt) return this.act({ go: globalOpt.go, idx: globalOpt.idx, preset: globalOpt.preset });
     }
 
     if (st.k === 'dtpick') return this.typedDateTime(raw, t);
@@ -536,7 +548,7 @@ class BotEngine {
     if (st.k === 'list' || st.k === 'btns') {
       if (S.sub === 'datepick' && st.key === 'Preferred date') return this.typedDate(raw);
       const o = this.matchOpt(st, t);
-      if (!o) return this.err(INVALID);
+      if (!o) return this.resend();
       if (o.more) {
         S.sub = 'more';
         return this.sendStep();
@@ -605,7 +617,10 @@ class BotEngine {
       return this.showMain();
     }
     const st = this.curStep();
-    if (!st || st.k !== 'media') return this.err(st && st.k === 'text' ? 'Please type your answer for this question.' : INVALID);
+    if (!st || st.k !== 'media') {
+      if (st && st.k === 'text') return this.err('Please type your answer for this question.');
+      return st ? this.resend() : this.showMain();
+    }
 
     const ok = list.filter((f) => f.supported && this.accepts(st, f));
     const bad = list.length - ok.length;
