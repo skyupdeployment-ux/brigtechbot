@@ -73,8 +73,9 @@ async function acceptWithoutFile(conv, user, number, name, type, why, payload) {
  * (the reason is written to the log).
  */
 // Pause between two messages. MSG91 / WhatsApp deliver messages one by one and a very short pause lets them overtake each other
-// (they arrived in the wrong order). 1.2 seconds keeps them in order. Set MSG91_SEND_GAP_MS in Railway to change it.
-const gapMs = () => (process.env.MSG91_SEND_GAP_MS === undefined || process.env.MSG91_SEND_GAP_MS === '' ? 1200 : env.MSG91_SEND_GAP_MS);
+// (they arrived in the wrong order, on one phone the WhatsApp card came after the buttons). 2 seconds keeps them in order far more reliably.
+// Set MSG91_SEND_GAP_MS in Railway to change it (in milliseconds: 2500 = 2.5 seconds).
+const gapMs = () => (process.env.MSG91_SEND_GAP_MS === undefined || process.env.MSG91_SEND_GAP_MS === '' ? 2000 : env.MSG91_SEND_GAP_MS);
 
 async function sendWelcome(number) {
   let captioned = false;
