@@ -9,7 +9,7 @@
  *   2. callbacks that used closures over browser state are now plain action codes.
  */
 
-const { P } = require('../../utils/text');
+const { P, strip } = require('../../utils/text');
 const contact = require('../../utils/contact');
 const appEnv = require('../../config/env');
 const { DateTime } = require('luxon');
@@ -20,7 +20,6 @@ const { formatDateShort, formatDateLong } = require('../../utils/time');
 const WELCOME_INTRO =
   'Dear Sir – Good Day!\n\nGreetings from BRIGHTECH-GROUP.\n\nOur Business activities are Industrial Automation PCB Products Repair & Service, Supply New & Discontinued/Obsolete Products & Automation Solutions.\n\n⚙️ OUR ACTIVITIES:\n\n🔧 PCB REPAIR & SERVICE – ANY BRANDS\n\n🏭 INDUSTRIAL SEGMENT:\nAC Drives (VFD), Servo Drives, HMI, PLC-CPU, I/O Modules, Genset Controllers, SMPS Units, Servo Motors, Spindles.\n\n🌱 WIND & SOLAR SEGMENT:\nIGBT Stacks, Driver Boards, Communication Boards, Adapter Boards, Industrial Cooling Fans, PLC-CPU & I/O Modules, HMI & Power Supply Units.\n\n🏢 BUILDING SEGMENT:\nHVAC & Chilling Unit AC Drives (VFD), DDC Controllers, Temperature Controller Units, all PCB Boards, High-Speed Cooling Fans, Exhaust Fans.\n\n🔌 SUPPLY OF AUTOMATION PRODUCTS – NEW / DISCONTINUED /OBSOLETE\nSiemens, Allen-Bradley, Mitsubishi, Schneider Electric, ABB, Omron, Delta, Fuji Electric, B&R, Rexroth, Lenze, GE Fanuc.\n\n🌐 https://www.brightech-group.com\n🌐 https://www.boss-mart.com\n\nSupporting by,\nSales Team\nBRIGHTECH GROUP';
 const WELCOME = 'For more information, please click the Options below';
-const INVALID = 'Sorry, that option is not valid. Please select one of the available options.';
 const COMMON =
   'Thank you for contacting Brightech!\n\nYour enquiry details have been collected.\n\nWhat would you like to do next?';
 
@@ -644,4 +643,24 @@ const GREET = ['hi', 'hello', 'good morning', 'good evening', 'hey', 'hii', 'hai
 
 const REF_CODES = { product: 'PRD', service: 'SVC', auto: 'AUT', robo: 'ROB', bms: 'BMS', career: 'CAR', contact: 'CNT' };
 
-module.exports = { WELCOME_INTRO, WELCOME, ABOUT_TEXT, MAINOPTS, FL, KW, GREET, INVALID, SCHED_TEXT, TIME_SLOTS, REF_CODES, buildDateOptions, infoMsg };
+/**
+ * First-level options of the menu services. A customer often taps an option of an OLD list that is still in the chat
+ * (for example "AC Drive / VFD" after the enquiry is finished): the bot then opens that option instead of complaining.
+ * Only options with a text that is unique across these lists are used ("Other" is too common to be one of them).
+ */
+const GLOBAL_OPTS = [];
+[
+  ['product', 1, 'Category', PRODUCT_CAT],
+  ['service', 1, 'Segment', SEGMENTS],
+  ['auto', 1, 'Solution type', AUTO],
+  ['robo', 1, 'Service', ROBO],
+  ['bms', 1, 'Requirement', BMS_SERVICES],
+  ['career', 1, 'Requirement', CAREER_MENU],
+].forEach(([go, idx, key, rows]) => rows.forEach((r) => GLOBAL_OPTS.push({ t: r.t, go, idx, preset: { [key]: r.t } })));
+const optKey = (t) => strip(t);
+for (let i = GLOBAL_OPTS.length - 1; i >= 0; i -= 1) {
+  const k = optKey(GLOBAL_OPTS[i].t);
+  if (k === 'other' || GLOBAL_OPTS.filter((o) => optKey(o.t) === k).length > 1) GLOBAL_OPTS.splice(i, 1);
+}
+
+module.exports = { WELCOME_INTRO, WELCOME, ABOUT_TEXT, MAINOPTS, FL, KW, GREET, GLOBAL_OPTS, SCHED_TEXT, TIME_SLOTS, REF_CODES, buildDateOptions, infoMsg };
