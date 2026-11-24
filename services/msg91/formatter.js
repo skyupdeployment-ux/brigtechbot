@@ -20,6 +20,8 @@ const cut = (s, n) => {
 const fmtDate = (key) => DateTime.fromISO(key).setLocale('en').toFormat('d LLL yyyy');
 const ddmmyyyy = (key) => DateTime.fromISO(key).toFormat('dd/LL/yyyy');
 
+const rowId = require('../../utils/rowId');
+
 function listParts(msg) {
   const rows = msg.list.rows;
   const nav = msg.list.nav || [];
@@ -52,7 +54,7 @@ function listParts(msg) {
           {
             title: cut(msg.list.title || 'Options', LIM.rowTitle),
             rows: shown.map((r) => ({
-              id: cut(r.t, 200),
+              id: (rows.includes(r) && rowId.encode(msg.list.ctx, r.t)) || cut(r.t, 200), // an option carries its list's context; Go Back / Main Menu stay plain
               title: cut(r.t, LIM.rowTitle),
               ...(r.d ? { description: cut(r.d, LIM.rowDesc) } : {}),
             })),
