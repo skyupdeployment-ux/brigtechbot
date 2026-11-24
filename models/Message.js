@@ -16,7 +16,7 @@ const messageSchema = new mongoose.Schema(
     quote: { type: String, maxlength: 600 }, // the bot message a user choice replied to
     list: {
       type: new mongoose.Schema(
-        { btn: String, title: String, rows: [rowSchema], nav: [rowSchema] },
+        { btn: String, title: String, rows: [rowSchema], nav: [rowSchema], ctx: { type: String, maxlength: 400 } },
         { _id: false }
       ),
       default: undefined,
