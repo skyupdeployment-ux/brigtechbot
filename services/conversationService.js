@@ -16,6 +16,7 @@ const activityService = require('./activityService');
 const fileService = require('./fileService');
 const realtime = require('./realtime');
 const serializers = require('../utils/serializers');
+const rowId = require('../utils/rowId');
 const AppError = require('../utils/AppError');
 const { withLock } = require('../utils/lock');
 const { nowIn, timeInfo } = require('../utils/time');
@@ -335,7 +336,7 @@ async function list(actor, query) {
 
 async function sendMessage(id, actor, body, ctx) {
   return withConversation(id, actor, async (c) => {
-    const userDoc = { role: 'user', kind: body.type === 'choice' ? 'choice' : 'text', text: body.text };
+    const userDoc = { role: 'user', kind: body.type === 'choice' ? 'choice' : 'text', text: rowId.optionOf(body.text) }; // a context id is stored as the option's own text
     if (body.type === 'choice') {
       if (body.desc) userDoc.desc = body.desc;
       const target = await resolveQuoteTarget(c.conv, body.messageId);
