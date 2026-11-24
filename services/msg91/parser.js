@@ -37,7 +37,7 @@ function pickReply(o) {
   const i = o.interactive && typeof o.interactive === 'object' ? o.interactive : o;
   const lr = i.list_reply || o.list_reply;
   const br = i.button_reply || o.button_reply;
-  if (lr) return str(lr.title) || str(lr.id);
+  if (lr) return str(lr.id)[0] === '§' ? str(lr.id) : str(lr.title) || str(lr.id); // our context ids start with §
   if (br) return str(br.title) || str(br.id);
   if (o.reply && typeof o.reply === 'object') return str(o.reply.title) || str(o.reply.id);
   if (o.button && typeof o.button === 'object') return str(o.button.text) || str(o.button.payload);
@@ -73,7 +73,7 @@ function deepReply(node, depth = 0) {
   }
   for (const k of ['list_reply', 'button_reply', 'reply', 'selectedOption', 'selected_option']) {
     if (node[k] && typeof node[k] === 'object') {
-      const r = str(node[k].title) || str(node[k].id) || str(node[k].text);
+      const r = (str(node[k].id)[0] === '§' ? str(node[k].id) : '') || str(node[k].title) || str(node[k].id) || str(node[k].text);
       if (r) return r;
     }
   }
