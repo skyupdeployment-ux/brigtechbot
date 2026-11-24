@@ -32,8 +32,7 @@ const whatsapp = (p) => `https://wa.me/${PHONE}?text=${encodeURIComponent(whatsa
 
 /**
  * The final enquiry step, the same for EVERY brand / product / service (one common handler). The messages, in this exact order:
- *   1. "You selected <the customer's selection>." - Please choose how you would like to send your enquiry:
- *   2. THREE cards, each with its own green button:
+ *   1. THREE cards, each with its own green button (the first card starts with "You selected <the customer's selection>."):
  *   Email your Enquiry    [Open Email]
  *   WhatsApp your Enquiry [Open WhatsApp]
  *   Call us for support   [Call +91-9620861000]
@@ -48,10 +47,8 @@ function enquiryItems(product, baseUrl, topic) {
   const topicQuery = EMAILS[String(topic || '')] && topic !== 'sales' ? `&t=${encodeURIComponent(topic)}` : '';
   const call = `Call ${PHONE_SHOW}`;
   return [
-    // 1. the confirmation comes FIRST and alone; nothing else is shown before it
-    { text: `✅ You selected *${p}*.\n\nPlease choose how you would like to send your enquiry:` },
-    // 2. Email, 3. WhatsApp, 4. Call: always in this order, each exactly once
-    { text: `✉️ *Email your Enquiry*\n${to}`, label: 'Open Email', url: baseUrl ? `${baseUrl}/go/email?p=${encodeURIComponent(p)}${topicQuery}` : null },
+    // 1+2. "You selected ..." is the top of the Email card: one message, so it can never be split from the Email card or arrive after it
+    { text: `✅ You selected *${p}*.\n\nPlease choose how you would like to send your enquiry:\n\n✉️ *Email your Enquiry*\n${to}`, label: 'Open Email', url: baseUrl ? `${baseUrl}/go/email?p=${encodeURIComponent(p)}${topicQuery}` : null },
     { text: `💬 *WhatsApp your Enquiry*\n${PHONE_SHOW}`, label: 'Open WhatsApp', url: whatsapp(p) },
     { text: `📞 *Call us for support*\n${PHONE_SHOW}`, label: call.slice(0, 20), url: baseUrl ? `${baseUrl}/go/call` : null },
   ];
