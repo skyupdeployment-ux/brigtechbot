@@ -13,6 +13,7 @@ const { norm, strip, clean } = require('../../utils/text');
 const { validateBookingDate, DATE_KEY_RE, formatNowLine, formatPicked, slotOfHour, parseTypedDateTime } = require('../../utils/time');
 const slotRules = require('../../utils/slots');
 const { MAINOPTS, FL, KW, GREET, GLOBAL_OPTS, SCHED_TEXT, REF_CODES } = require('./flows');
+const rowId = require('../../utils/rowId');
 
 const toPairs = (obj) => Object.keys(obj).map((k) => ({ k, v: obj[k] }));
 const fromPairs = (arr) => (Array.isArray(arr) ? arr : []).reduce((o, p) => ((o[p.k] = p.v), o), {});
@@ -121,7 +122,14 @@ class BotEngine {
         if (st.more) rows.push({ t: st.more.label, d: st.more.desc, more: true });
       }
       const nav = !st.nonav && S.flow !== 'main' ? [{ t: '⬅️ Go Back' }, { t: '🏠 Main Menu' }] : [];
-      this.bot({ head, text: body, list: { btn: st.btn, title: st.head || st.btn, rows: rows.map(rowView), nav: nav.map(rowView) } });
+      // the list remembers where it was (flow, step and the earlier list answers) so a tap on it later still works
+      let ctx;
+      if (S.flow !== 'main' && !S.sub) {
+        const d = {};
+        f.steps.slice(0, S.idx).forEach((p) => { if (p.k === 'list' && S.data[p.key] !== undefined) d[p.key] = S.data[p.key]; });
+        ctx = JSON.stringify({ f: S.flow, i: S.idx, d });
+      }
+      this.bot({ head, text: body, list: { btn: st.btn, title: st.head || st.btn, rows: rows.map(rowView), nav: nav.map(rowView), ctx } });
     } else if (st.k === 'dtpick') {
       // just the current date and time, then the "Pick date and time" button (nothing else)
       this.bot({ text: (prefix || '') + '🕒 *Now:* ' + formatNowLine(this.ctx.tz), picker: true });
@@ -319,7 +327,7 @@ class BotEngine {
 
   endConv() {
     const S = this.S;
-    this.bot({ text: 'Thank you for contacting Brightech Group. 😊\n\nSend *Hi* any time to start a new conversation.' });
+    this.bot({ text: 'Thank you for contacting Brightech Group!\n\nWe appreciate your interest. Our team will be happy to assist you.\n\nSend *Hi* any time to start a new conversation.' });
     S.ended = true;
     S.flow = null;
     S.hist = [];
@@ -497,7 +505,37 @@ class BotEngine {
     return res;
   }
 
-  onText(raw) {
+  /**
+   * A tap on a row of a list carries that list's context (see utils/rowId.js). If it is NOT the list the conversation is at
+   * now (an older list, even from before "End Conversation"), the conversation is put back exactly where that list was, and the
+   * option is then handled as if it had just been tapped there. Returns the option's own text.
+   */
+  restoreFromRow(raw) {
+    const m = rowId.decode(raw);
+    if (!m) return raw;
+    const S = this.S;
+    const f = FL[m.f];
+    const st = f && f.steps[m.i];
+    if (!st || st.k !== 'list') return m.o; // not a list we know: use the plain option text
+    const here = S.started && !S.ended && S.flow === m.f && S.idx === m.i && !S.sub && Object.keys(m.d).every((k) => S.data[k] === m.d[k]);
+    if (!here) {
+      if (!S.started || S.ended) this.effects.push({ type: 'STARTED' });
+      S.started = true;
+      S.ended = false;
+      S.flow = m.f;
+      S.idx = m.i;
+      S.sub = null;
+      S.data = Object.assign({}, m.d);
+      S.files = {};
+      S.fname = f.name;
+      S.pendingFlow = null;
+      S.hist = [{ flow: 'main', idx: 0, sub: null }];
+    }
+    return m.o;
+  }
+
+  onText(raw0) {
+    const raw = this.restoreFromRow(raw0);
     const S = this.S;
     const t = norm(raw);
     const st = this.curStep();
