@@ -20,6 +20,7 @@ const { parseInbound } = require('./parser');
 const BotEngine = require('../flow/engine');
 const { GREET, WELCOME, WELCOME_INTRO } = require('../flow/flows');
 const { norm } = require('../../utils/text');
+const delivery = require('./delivery');
 const { withLock } = require('../../utils/lock');
 const logger = require('../../utils/logger');
 
@@ -121,10 +122,31 @@ async function findOrCreateConversation(number) {
   return { user, conv };
 }
 
+/**
+ * One burst of replies to one customer at a time. Two taps in quick succession (or a repeated webhook) used to send
+ * their replies at the same time and the cards of the two bursts were mixed up; now the second burst waits for the first.
+ */
+const bursts = new Map(); // customer number -> the burst that is being sent
+function inOrder(number, job) {
+  const next = (bursts.get(number) || Promise.resolve()).catch(() => {}).then(job);
+  bursts.set(number, next);
+  next.catch(() => {}).then(() => { if (bursts.get(number) === next) bursts.delete(number); });
+  return next;
+}
+const deliver = (number, botMessages) => inOrder(number, () => deliverNow(number, botMessages));
+
 /** Sends the bot's replies in order. Interactive payload first; plain-text fallback if MSG91 rejects it. */
-async function deliver(number, botMessages) {
+async function deliverNow(number, botMessages) {
+  let afterCards = false; // the previous message was one of the Email / WhatsApp / Call cards
   for (const msg of botMessages) {
+    // Without MSG91's reports the buttons ("Is there anything else...") get 3 more seconds, so a slow card cannot arrive after them
+    if (msg.buttons && afterCards && gapMs() > 0 && !delivery.healthy()) await sleep(3000);
+    afterCards = !!msg.cta;
     for (const part of formatter.build(msg)) {
+      // When MSG91's delivery reports arrive (webhook "On Outbound Report Received"), the next message is sent only after
+      // MSG91 says this one was handed to WhatsApp, so the messages cannot overtake each other. Otherwise a fixed pause.
+      const gap = gapMs();
+      const expected = gap > 0 && delivery.healthy() ? delivery.expect(number) : null;
       try {
         if (part.kind === 'text') await client.sendText(number, part.text);
         else if (!env.MSG91_INTERACTIVE) await client.sendText(number, part.fallbackText);
@@ -137,13 +159,29 @@ async function deliver(number, botMessages) {
           }
         }
       } catch (e) {
+        if (expected) expected.cancel();
         logger.error(`MSG91 send failed for ${number}: ${e.message}`);
         return false; // no point sending the rest if the key/IP/number is wrong
       }
-      if (gapMs()) await sleep(gapMs());
+      if (expected) {
+        if (!(await expected.wait(Math.max(gap, 4000)))) logger.warn(`MSG91 did not confirm a message to ${number} in time: sending the next one anyway`);
+        await sleep(300); // a short safety pause after MSG91's confirmation
+      } else if (gap) await sleep(gap);
     }
   }
   return true;
+}
+
+// A double tap: the same list row / button tapped again within a few seconds is ignored (the first tap is still being answered).
+const recentTaps = new Map(); // customer number -> { text, at }
+const DOUBLE_TAP_MS = 6000;
+function isDoubleTap(ev) {
+  if (ev.kind !== 'choice') return false;
+  const now = Date.now();
+  const last = recentTaps.get(ev.number);
+  recentTaps.set(ev.number, { text: ev.text, at: now });
+  if (recentTaps.size > 5000) for (const [k, v] of recentTaps) if (now - v.at > DOUBLE_TAP_MS) recentTaps.delete(k);
+  return !!last && last.text === ev.text && now - last.at < DOUBLE_TAP_MS;
 }
 
 async function handleOne(payload) {
@@ -168,6 +206,11 @@ async function handleOne(payload) {
       .sendText(ev.number, `Bot version: ${env.VERSION}\nCalendar booking: ${calendar ? 'ON' : 'OFF'}${calendar ? `\nCalendar address: ${env.PUBLIC_BASE_URL}` : ''}`)
       .catch((e) => logger.warn(`MSG91 send failed: ${e.message}`));
     return { handled: true, kind: 'version' };
+  }
+
+  if (isDoubleTap(ev)) {
+    logger.info(`MSG91 double tap ignored for ${ev.number}`);
+    return { handled: false, reason: 'double tap' };
   }
 
   return withLock(`wa:${ev.number}`, async () => {
@@ -222,10 +265,12 @@ async function handleOne(payload) {
       }
 
       // "Hi" (or a first message) that brings up the main menu: poster + company text come first
-      if (ev.kind === 'text' && (GREET.includes(norm(ev.text)) || conv.messageCount === 0) && result.botMessages.some((m) => m.list && (m.text || '') === WELCOME)) {
-        await sendWelcome(ev.number);
-      }
-      await deliver(ev.number, result.botMessages);
+      const welcome = ev.kind === 'text' && (GREET.includes(norm(ev.text)) || conv.messageCount === 0) && result.botMessages.some((m) => m.list && (m.text || '') === WELCOME);
+      // the welcome and the replies are ONE burst: nothing else is sent to this customer in between
+      await inOrder(ev.number, async () => {
+        if (welcome) await sendWelcome(ev.number);
+        await deliverNow(ev.number, result.botMessages);
+      });
       return { handled: true, kind: ev.kind, enquiry: result.enquiry };
     } catch (e) {
       await InboundEvent.deleteOne({ eventId: ev.eventId }).catch(() => {}); // allow a manual replay
