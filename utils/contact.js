@@ -31,7 +31,27 @@ const whatsappText = (p) => `Hello Brightech Group, I am interested in ${p || 'y
 const whatsapp = (p) => `https://wa.me/${PHONE}?text=${encodeURIComponent(whatsappText(p))}`;
 
 /**
- * The final enquiry step, the same for EVERY brand / product / service (one common handler). The messages, in this exact order:
+ * How the final enquiry is shown (Railway variable ENQUIRY_STYLE):
+ *   "single" (the default) - ONE message: the selection, Email, WhatsApp, Call and the question, with the Main Menu / End Conversation buttons.
+ *                            One message cannot arrive in the wrong order, and it costs 1 message instead of 4.
+ *   "cards"                - the green Email / WhatsApp / Call cards, one message each (MSG91 may deliver them in a different order).
+ */
+const singleStyle = () => String(process.env.ENQUIRY_STYLE || 'single').toLowerCase() !== 'cards';
+
+/** The single message. WhatsApp makes the email address, the phone number and the link tappable. */
+function enquiryBody(product, topic) {
+  const p = clip(product);
+  return (
+    `✅ You selected *${p}*.\n\nPlease choose how you would like to send your enquiry:\n\n` +
+    `✉️ *Email your Enquiry*\n${emailFor(topic)}\n\n` +
+    `💬 *WhatsApp your Enquiry*\n${whatsapp(p)}\n\n` +
+    `📞 *Call us for support*\n${PHONE_SHOW}\n\n` +
+    'Is there anything else we can help you with?'
+  );
+}
+
+/**
+ * The final enquiry step in "cards" style, the same for EVERY brand / product / service (one common handler). The messages, in this exact order:
  *   1. THREE cards, each with its own green button (the first card starts with "You selected <the customer's selection>."):
  *   Email your Enquiry    [Open Email]
  *   WhatsApp your Enquiry [Open WhatsApp]
@@ -67,4 +87,4 @@ a.b{display:block;margin-top:18px;padding:15px;border-radius:14px;background:#00
 <body><main><div class="card"><h1>${esc(title)}</h1><p>${esc(note)}</p><a class="b" href="${esc(url)}">${esc(button)}</a></div></main></body></html>`;
 }
 
-module.exports = { EMAIL, CAREERS_EMAIL, HR_EMAIL, emailFor, PHONE, PHONE_SHOW, clip, mailto, tel, whatsapp, whatsappText, enquiryItems, openPage };
+module.exports = { singleStyle, enquiryBody, EMAIL, CAREERS_EMAIL, HR_EMAIL, emailFor, PHONE, PHONE_SHOW, clip, mailto, tel, whatsapp, whatsappText, enquiryItems, openPage };
