@@ -138,7 +138,8 @@ class BotEngine {
       if (st.links && !(opts && opts.skipCards)) st.links(this).forEach((it) => this.bot({ text: it.text, cta: it.url ? { text: it.label, url: it.url } : undefined }));
       const b = st.opts.map((o) => o.t);
       if (!st.nonav && b.length === 2) b.push('Go Back');
-      this.bot({ text: typeof st.body === 'function' ? st.body(this) : st.body, btns: b });
+      const again = opts && opts.skipCards && st.again; // a repeat tap: only the short question, never the whole enquiry again
+      this.bot({ text: again || (typeof st.body === 'function' ? st.body(this) : st.body), btns: b });
     } else if (st.k === 'text') {
       const b = [];
       if (st.opt) b.push('Skip');
