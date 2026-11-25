@@ -32,11 +32,12 @@ const whatsapp = (p) => `https://wa.me/${PHONE}?text=${encodeURIComponent(whatsa
 
 /**
  * How the final enquiry is shown (Railway variable ENQUIRY_STYLE):
- *   "single" (the default) - ONE message: the selection, Email, WhatsApp, Call and the question, with the Main Menu / End Conversation buttons.
- *                            One message cannot arrive in the wrong order, and it costs 1 message instead of 4.
- *   "cards"                - the green Email / WhatsApp / Call cards, one message each (MSG91 may deliver them in a different order).
+ *   "cards" (the default)  - the green Email / WhatsApp / Call cards, one message each. MSG91 can deliver messages in a different order:
+ *                            the delivery-report webhook in MSG91 (see services/msg91/delivery.js) is what keeps them in order.
+ *   "single"               - ONE message with the selection, Email, WhatsApp, Call and the question (+ Main Menu / End Conversation).
+ *                            One message cannot arrive in the wrong order, and it costs 1 message instead of 4. Set ENQUIRY_STYLE=single.
  */
-const singleStyle = () => String(process.env.ENQUIRY_STYLE || 'single').toLowerCase() !== 'cards';
+const singleStyle = () => String(process.env.ENQUIRY_STYLE || 'cards').toLowerCase() === 'single';
 
 /** The single message. WhatsApp makes the email address, the phone number and the link tappable. */
 function enquiryBody(product, topic) {
