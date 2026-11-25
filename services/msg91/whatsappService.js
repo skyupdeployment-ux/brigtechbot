@@ -73,10 +73,10 @@ async function acceptWithoutFile(conv, user, number, name, type, why, payload) {
  * the bot as usual. If the picture cannot be sent, or WhatsApp refuses the caption, the customer still gets the text
  * (the reason is written to the log).
  */
-// Pause between two messages. MSG91 / WhatsApp deliver messages one by one and a very short pause lets them overtake each other
-// (they arrived in the wrong order, on one phone the WhatsApp card came after the buttons). 2 seconds keeps them in order far more reliably.
+// Pause between two messages. MSG91 / WhatsApp deliver messages one by one and a short pause lets them overtake each other
+// (on a phone the WhatsApp card came after the buttons). 3 seconds keeps them in order much more reliably (the delivery reports make it exact).
 // Set MSG91_SEND_GAP_MS in Railway to change it (in milliseconds: 2500 = 2.5 seconds).
-const gapMs = () => (process.env.MSG91_SEND_GAP_MS === undefined || process.env.MSG91_SEND_GAP_MS === '' ? 2000 : env.MSG91_SEND_GAP_MS);
+const gapMs = () => (process.env.MSG91_SEND_GAP_MS === undefined || process.env.MSG91_SEND_GAP_MS === '' ? 3000 : env.MSG91_SEND_GAP_MS);
 
 async function sendWelcome(number) {
   let captioned = false;
