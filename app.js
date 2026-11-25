@@ -62,6 +62,9 @@ if (env.NODE_ENV !== 'test') app.use(morgan(env.isProd ? 'combined' : 'dev'));
 // before everything else, is not rate limited, and answers 200 even when the body is not valid JSON.
 app.post('/api/webhooks/msg91/report', express.json({ limit: '50kb' }), (_err, _req, res, _next) => res.status(200).json({ success: true }), require('./controllers/msg91Controller').report);
 
+// Opening the report address in a browser (GET) shows that it is ready, and a GET ping from MSG91 is answered 200 (a 4xx would pause the webhook). MSG91 itself sends POST.
+app.get('/api/webhooks/msg91/report', (_req, res) => res.status(200).json({ success: true, message: 'MSG91 delivery-report webhook is ready. It accepts POST requests from MSG91; this page is only for checking.' }));
+
 app.use(express.json({ limit: '50kb' }));
 app.use(sanitize);
 
