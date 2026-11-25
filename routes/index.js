@@ -11,6 +11,7 @@ const v = require('../validators');
 const { ok } = require('../utils/response');
 const env = require('../config/env');
 const diagnostics = require('../utils/diagnostics');
+const delivery = require('../services/msg91/delivery');
 
 // "version" changes whenever the WhatsApp code changes, so you can see which build is really running.
 router.get('/health', (_req, res) =>
@@ -46,7 +47,10 @@ router.get('/status', (_req, res) => {
       webhookSecretSet: !!env.MSG91_WEBHOOK_SECRET,
       publicAddress: env.PUBLIC_BASE_URL || null,
     },
+    enquiryStyle: require('../utils/contact').singleStyle() ? 'single (one message per enquiry)' : 'cards (one message per card)',
     webhook: { accepted: d.accepted, rejected: d.rejected, lastResult: d.lastResult, secondsSinceLast: d.secondsSinceLast },
+    // MSG91's delivery reports (second webhook): when they arrive, every message waits for the one before it
+    deliveryReports: { ...delivery.stats(), ordering: delivery.healthy() ? 'each message waits until MSG91 confirms the one before it' : 'fixed pause between messages (the report webhook is not set up in MSG91, or no report arrived in the last 10 minutes)' },
     recentProblems: d.problems,
   });
 });
