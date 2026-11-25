@@ -69,8 +69,33 @@ const PRODUCT_CAT_FULL = PRODUCT_CAT.map((o, i) =>
   })
 );
 
+/* ---------------- 6 Training Division and 7 PCB Reverse Engineering: the titles the client listed (short title + the full title below it) ---------------- */
+const TRAINING_TITLES = [
+  ['Experienced Training', 'EXPERIENCED TRAINING SOLUTIONS'],
+  ['Brand Specialization', 'INDUSTRIAL AUTOMATION – BRAND SPECIALIZATION TRAINING'],
+  ['R&D & Engineering', 'R&D and ENGINEERING SOLUTIONS'],
+  ['Data Connectivity', 'DATA CONNECTIVITY & INTEGRATION'],
+  ['Mechanical Training', 'MECHANICAL ENGINEERING TRAINING'],
+  ['Digital Engineering', 'DIGITAL ENGINEERING TRAINING'],
+  ['Automation Solutions', 'AUTOMATION SOLUTIONS'],
+];
+const PCB_DESIGN_TITLES = [
+  ['Reverse Engineering', 'REVERSE ENGINEERING & RE-ENGINEERING SERVICE'],
+  ['PCB Design', 'PCB DESIGN: (PRINTED CIRCUIT BOARD DESIGN)'],
+  ['Prototyping & Mfg', 'PROTOTYPING & ELECTRONIC MANUFACTURING SERVICES'],
+  ['Custom Electronics', 'CUSTOM ELECTRONICS DESIGN'],
+  ['Embedded Systems', 'EMBEDDED SYSTEMS DESIGN - HARDWARE & FIRMWARE(SOFTWARE)'],
+  ['Hardware & PCB Design', 'ELECTRONIC HARDWARE & PCB DESIGN SERVICE'],
+  ['IoT Hardware & Sensor', 'IoT HARDWARE & IoT SENSOR'],
+];
+// a list row has a short title (WhatsApp cuts 24 characters) and the full title as its description; the contact cards use the full title
+const titleRows = (list) => P(list.map(([t, full]) => `${t}|${full}`));
+const fullTitle = (list, short) => (list.find(([t]) => t === short) || [short, short])[1];
+const TRAINING_ROWS = titleRows(TRAINING_TITLES);
+const PCB_DESIGN_ROWS = titleRows(PCB_DESIGN_TITLES);
+
 /* ---------------- Contact Us: one address message per branch (from brightech-group.com/contact_us) ---------------- */
-const BRANCH_ROWS = P(['Bangalore|Head Office & Factory', 'Chennai|Corporate Office & Factory', 'Coimbatore|Service Centre & Factory', 'Dindigul|Service Center & Office', 'Malaysia']);
+const BRANCH_ROWS = P(['Bangalore|Head Office & Factory', 'Chennai|Corporate Office & Factory', 'Coimbatore|Service Centre & Factory', 'Dindigul|Service Center & Office', 'Malaysia|Office']);
 const BRANCH_TEXT = {
   Bangalore: `📍 *Bangalore* – Head Office & Factory
 Brightech Industrial Automation Pvt. Ltd.
@@ -87,7 +112,7 @@ No.7B, 1st Floor, Basappa Reddy Compound, Y.V.Annaiah Road, Yelachanahalli, Bang
 Sales Team: 9606815911, 9900002204`,
   Chennai: `📍 *Chennai* – Corporate Office & Factory
 Brightech Industrial Automation Pvt. Ltd.
-No.14/76, SHRIWIN, Ground Floor, 3rd Main Rd, Ayyavoo Nagar, Maduravoyal, Chennai, Tamil Nadu 600095.
+S-1, 2nd Floor, No.89/52, Oragadam Rd, Venkatapuram, OT, Ambattur, Chennai, Tamil Nadu 600053.
 Sales Team: 9606328004, 9606328002, 9606821911`,
   Coimbatore: `📍 *Coimbatore* – Service Centre & Factory
 BRIGHTECH ENGINEERING
@@ -97,10 +122,8 @@ Sales Team: 9606328004, 9035028270, 9606328002`,
 BRIGHTECH ENGINEERING
 No. 11-7-23-E3, Anna Nagar Main Street, Mettupatti, Chinnalapatti, Dindigul, Tamil Nadu - 624 301.
 Sales Team: 9606526100, 9845359300`,
-  // TODO: put the real Malaysia address here (it is not on the website's Contact Us page)
-  Malaysia: `📍 *Malaysia*
-The Malaysia branch address will be shared shortly.
-For now please contact us on ${contact.PHONE_SHOW} or ${contact.EMAIL}.`,
+  Malaysia: `📍 *Malaysia* – Office
+No.23A-2, Jalan Nagasari E, 36/E, Desa Latania, Seksyen 36, 40470, Shah Alam, Malaysia.`,
 };
 
 /* ---------------- PCB Repair & Service: segments and the products of each ---------------- */
@@ -593,22 +616,28 @@ const FL = {
     done: 'Thank you! Our recruitment team will contact you regarding your enquiry.',
   },
 
-  // NEW: menu title only -> Email / WhatsApp / Call
+  // NEW: Select Title (the client's 7 titles) -> Email / WhatsApp / Call
   trainingdiv: {
     name: 'Training Division & R&D Division',
     icon: '🎓',
     top: 'trainingdiv',
     topLevel: true,
-    steps: [CONTACT_STEP(() => 'TRAINING DIVISION & R&D DIVISION')],
+    steps: [
+      L('Title', 'Training Division', 'Select Title', 'TRAINING DIVISION & R&D DIVISION\n\nPlease select a title.', TRAINING_ROWS),
+      CONTACT_STEP((e) => fullTitle(TRAINING_TITLES, e.S.data['Title'])),
+    ],
   },
 
-  // NEW: menu title only -> Email / WhatsApp / Call
+  // NEW: Select Title (the client's 7 titles) -> Email / WhatsApp / Call
   pcbdesign: {
     name: 'PCB Reverse Engineering & PCB New Design',
     icon: '🧩',
     top: 'pcbdesign',
     topLevel: true,
-    steps: [CONTACT_STEP(() => 'PCB REVERSE ENGINEERING & PCB NEW DESIGN')],
+    steps: [
+      L('Title', 'PCB Reverse & Design', 'Select Title', 'PCB REVERSE ENGINEERING & PCB NEW DESIGN\n\nPlease select a title.', PCB_DESIGN_ROWS),
+      CONTACT_STEP((e) => fullTitle(PCB_DESIGN_TITLES, e.S.data['Title'])),
+    ],
   },
 
   // NEW: Contact Us: pick a branch -> its address -> then Email / WhatsApp / Call (below the address)
