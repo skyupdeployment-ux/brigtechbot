@@ -58,6 +58,10 @@ app.use(
 
 if (env.NODE_ENV !== 'test') app.use(morgan(env.isProd ? 'combined' : 'dev'));
 
+// Delivery reports from MSG91 (3 or 4 per message). MSG91 PAUSES a webhook that gets a 4xx answer, so this route is read
+// before everything else, is not rate limited, and answers 200 even when the body is not valid JSON.
+app.post('/api/webhooks/msg91/report', express.json({ limit: '50kb' }), (_err, _req, res, _next) => res.status(200).json({ success: true }), require('./controllers/msg91Controller').report);
+
 app.use(express.json({ limit: '50kb' }));
 app.use(sanitize);
 
