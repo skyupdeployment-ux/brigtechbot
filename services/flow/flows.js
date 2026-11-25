@@ -306,13 +306,19 @@ const L = (key, head, btn, body, opts, x = {}) => Object.assign({ k: 'list', key
 const B = (key, body, opts, x = {}) => Object.assign({ k: 'btns', key, body, opts: P(opts) }, x);
 const CONT = '\n\nTap *Continue* when you have finished.';
 // Last step of the Product Enquiry / PCB Repair flows: the three ways to send the enquiry
-const CONTACT_STEP = (key, topic) =>
-  B('Contact', 'Is there anything else we can help you with?', ['Main Menu', 'End Conversation'], {
+const ASK_MORE = 'Is there anything else we can help you with?';
+// The final enquiry (the same everywhere). ENQUIRY_STYLE=single (default): ONE message with Email, WhatsApp, Call and the buttons.
+// ENQUIRY_STYLE=cards: the green cards, one message each. `key` = the name of one answer, or a function that builds the label from several answers.
+const CONTACT_STEP = (key, topic) => {
+  const label = (e) => (typeof key === 'function' ? key(e) : e.S.data[key]);
+  const email = (e) => (typeof topic === 'function' ? topic(e) : topic); // which address: sales / careers / hr
+  return B('Contact', (e) => (contact.singleStyle() ? contact.enquiryBody(label(e), email(e)) : ASK_MORE), ['Main Menu', 'End Conversation'], {
     nonav: true,
-    // `key` = the name of one answer, or a function that builds the label from several answers (e.g. "PLC - Siemens")
-    links: (e) => contact.enquiryItems(typeof key === 'function' ? key(e) : e.S.data[key], appEnv.PUBLIC_BASE_URL, typeof topic === 'function' ? topic(e) : topic), // sent first: the three cards (topic = which email address: sales / careers / hr)
+    again: ASK_MORE, // shown alone when the customer taps or types something else after the enquiry
+    links: (e) => (contact.singleStyle() ? [] : contact.enquiryItems(label(e), appEnv.PUBLIC_BASE_URL, email(e))), // "cards" style: sent first, one message each
     route: { 'main menu': 'MAIN', 'end conversation': 'END' },
   });
+};
 
 const SCHED_TEXT = {
   product: 'When should our sales team contact you?',
@@ -648,10 +654,11 @@ const FL = {
     topLevel: true,
     steps: [
       L('Branch', 'Contact Us', 'Select Branch', 'Brightech Group - Contact Us\n\nPlease select the branch to see its address.', BRANCH_ROWS),
-      B('Contact', 'Is there anything else we can help you with?', ['Main Menu', 'End Conversation'], {
+      B('Contact', (e) => (contact.singleStyle() ? contact.enquiryBody(e.S.data['Branch'] + ' Branch') : ASK_MORE), ['Main Menu', 'End Conversation'], {
         nonav: true,
-        // sent first: the branch address, then the same Email / WhatsApp / Call cards as everywhere else
-        links: (e) => [{ text: BRANCH_TEXT[e.S.data['Branch']] || BRANCH_TEXT.Bangalore }].concat(contact.enquiryItems(e.S.data['Branch'] + ' Branch', appEnv.PUBLIC_BASE_URL)),
+        again: ASK_MORE,
+        // sent first: the branch address; then (cards style) the same Email / WhatsApp / Call cards as everywhere else
+        links: (e) => [{ text: BRANCH_TEXT[e.S.data['Branch']] || BRANCH_TEXT.Bangalore }].concat(contact.singleStyle() ? [] : contact.enquiryItems(e.S.data['Branch'] + ' Branch', appEnv.PUBLIC_BASE_URL)),
         route: { 'main menu': 'MAIN', 'end conversation': 'END' },
       }),
     ],
